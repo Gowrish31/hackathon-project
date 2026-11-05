@@ -1,0 +1,464 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="color-scheme" content="light dark">
+<title>Aegis Endpoint Kit</title>
+<meta name="description" content="Download Aegis Setup for Windows. It finds the Aegis console on your network, asks to join, and installs the endpoint agent.">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Cpath d='M16 3 5 7v8c0 6.6 4.6 12.4 11 14 6.4-1.6 11-7.4 11-14V7z' fill='%231F3D66'/%3E%3C/svg%3E">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Archivo:wdth,wght@62..125,500..800&family=Atkinson+Hyperlegible+Mono:wght@400;500&family=Atkinson+Hyperlegible+Next:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  /* case file: grey-green evidence paper, ink, a navy spine (same tokens as the console) */
+  :root {
+    color-scheme: light;
+    --bg: #f3f4ef; --surface: #e9ebe4; --raised: #e0e3db; --line: #c6cbc0; --line-soft: #dadfd4;
+    --text: #15181b; --text-2: #3f464d; --muted: #646b72; --accent: #1f3d66;
+    --spine: #172a45; --spine-ink: #f3f4ef; --spine-muted: #8d9bb0;
+    --crit: #bf1131; --med: #8c6800; --ok: #1f7446;
+    --sans: "Atkinson Hyperlegible Next", ui-sans-serif, system-ui, sans-serif;
+    --mono: "Atkinson Hyperlegible Mono", ui-monospace, monospace;
+    --cond: "Archivo", "Atkinson Hyperlegible Next", ui-sans-serif, sans-serif;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      color-scheme: dark;
+      --bg: #0d1014; --surface: #13171d; --raised: #1a1f27; --line: #2a313c; --line-soft: #1b2028;
+      --text: #e4e8ee; --text-2: #a7afbc; --muted: #7a8494; --accent: #93a9ff;
+      --spine: #13171d; --spine-ink: #e4e8ee; --spine-muted: #6c7584;
+      --crit: #f2506b; --med: #e6b94f; --ok: #4fc48d;
+    }
+  }
+  :root[data-theme="dark"] {
+    color-scheme: dark;
+    --bg: #0d1014; --surface: #13171d; --raised: #1a1f27; --line: #2a313c; --line-soft: #1b2028;
+    --text: #e4e8ee; --text-2: #a7afbc; --muted: #7a8494; --accent: #93a9ff;
+    --spine: #13171d; --spine-ink: #e4e8ee; --spine-muted: #6c7584;
+    --crit: #f2506b; --med: #e6b94f; --ok: #4fc48d;
+  }
+
+  * { box-sizing: border-box; }
+  html, body { margin: 0; }
+  body {
+    background: var(--bg); color: var(--text);
+    font: 16px/1.55 var(--sans); -webkit-font-smoothing: antialiased;
+    font-feature-settings: "tnum" 1;
+  }
+  a { color: var(--accent); }
+  code, .mono { font-family: var(--mono); }
+  .cond { font-family: var(--cond); font-stretch: 72%; letter-spacing: -0.005em; }
+
+  /* the spine: a navy binding down the left edge, as on the console */
+  .spine {
+    position: fixed; inset: 0 auto 0 0; width: 56px; background: var(--spine); color: var(--spine-ink);
+    display: flex; flex-direction: column; align-items: center; padding: 18px 0; z-index: 2;
+  }
+  .spine svg { width: 26px; height: 26px; }
+  .spine .vert {
+    margin-top: 22px; writing-mode: vertical-rl; transform: rotate(180deg);
+    font: 600 12px/1 var(--cond); font-stretch: 90%; letter-spacing: 0.32em; text-transform: uppercase; color: var(--spine-muted);
+  }
+  .spine .vert b { color: var(--spine-ink); font-weight: 700; }
+  .page { margin-left: 56px; }
+  .wrap { max-width: 1160px; margin: 0 auto; padding: 0 40px; }
+
+  header.top { border-bottom: 1px solid var(--line); }
+  header.top .wrap { display: flex; align-items: center; gap: 24px; height: 56px; font-size: 14px; }
+  header.top .brand { font: 700 20px/1 var(--cond); font-stretch: 80%; letter-spacing: 0.04em; }
+  header.top nav { margin-left: auto; display: flex; gap: 22px; }
+  header.top nav a { color: var(--text-2); text-decoration: none; }
+  header.top nav a:hover { color: var(--text); text-decoration: underline; }
+
+  /* ---- hero */
+  .hero { padding: 64px 0 56px; border-bottom: 1px solid var(--line); }
+  .hero .wrap { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.02fr); gap: 56px; align-items: start; }
+  .kicker { font: 600 12px/1 var(--sans); letter-spacing: 0.14em; text-transform: uppercase; color: var(--muted); }
+  h1 {
+    margin: 14px 0 0; font: 700 clamp(44px, 6.4vw, 78px)/0.94 var(--cond); font-stretch: 68%; letter-spacing: -0.01em;
+  }
+  h1 em { font-style: normal; color: var(--accent); }
+  .lede { margin: 20px 0 0; max-width: 34em; font-size: 18px; color: var(--text-2); }
+
+  .get { margin-top: 30px; }
+  .btn {
+    display: inline-flex; align-items: center; gap: 12px; padding: 14px 20px 14px 16px;
+    background: var(--accent); color: var(--bg); text-decoration: none; border-radius: 2px;
+    font: 600 16px/1 var(--sans); border: 0; cursor: pointer;
+  }
+  .btn:hover { filter: brightness(1.12); }
+  .btn svg { width: 22px; height: 22px; flex: none; }
+  .btn small { display: block; margin-top: 4px; font: 400 12.5px/1 var(--sans); opacity: 0.8; }
+  .get .meta { margin-top: 10px; font-size: 13px; color: var(--muted); }
+  .notwin {
+    display: none; margin-top: 14px; padding: 10px 12px; border-left: 3px solid var(--med);
+    background: var(--surface); font-size: 14px; color: var(--text-2); max-width: 34em;
+  }
+
+  .oneliner { margin-top: 26px; max-width: 520px; }
+  .oneliner p { margin: 0 0 8px; font-size: 14px; color: var(--text-2); }
+  .cmd { display: flex; align-items: stretch; border: 1px solid var(--line); background: var(--surface); border-radius: 2px; }
+  .cmd code { flex: 1; min-width: 0; padding: 11px 13px; font-size: 13.5px; white-space: nowrap; overflow-x: auto; user-select: all; }
+  .cmd button {
+    flex: none; border: 0; border-left: 1px solid var(--line); background: transparent; color: var(--text);
+    font: 500 13px/1 var(--sans); padding: 0 16px; cursor: pointer;
+  }
+  .cmd button:hover { background: var(--raised); }
+  .cmd button.done { background: var(--ok); color: var(--bg); }
+
+  /* transcript: what the laptop shows, printed on paper rather than a neon terminal */
+  .sheet { border: 1px solid var(--line); background: var(--surface); border-radius: 2px; box-shadow: 6px 6px 0 var(--line-soft); }
+  .sheet .bar {
+    display: flex; align-items: center; gap: 10px; padding: 9px 14px; border-bottom: 1px solid var(--line);
+    font-size: 12.5px; color: var(--muted);
+  }
+  .sheet .bar b { color: var(--text-2); font-weight: 600; }
+  .sheet .bar .t { margin-left: auto; font-family: var(--mono); }
+  .log { margin: 0; padding: 16px 18px 18px; font: 13px/1.62 var(--mono); color: var(--text-2); min-height: 452px; white-space: pre-wrap; overflow-wrap: anywhere; }
+  .log .l { display: block; }
+  .log .l:empty { min-height: 1.62em; }
+  .log .hd { color: var(--accent); font-weight: 500; }
+  .log .dim { color: var(--muted); }
+  .log .ok { color: var(--ok); }
+  .log .warn { color: var(--med); }
+  .log .good { color: var(--ok); font-weight: 500; }
+  .log .cur::after { content: "▍"; color: var(--accent); animation: blink 1s steps(1) infinite; }
+  @keyframes blink { 50% { opacity: 0; } }
+
+  /* ---- sections */
+  section.band { padding: 64px 0; border-bottom: 1px solid var(--line); }
+  .shead { display: grid; grid-template-columns: 200px minmax(0, 1fr); gap: 40px; align-items: baseline; }
+  .shead .no { font: 600 12px/1 var(--sans); letter-spacing: 0.14em; text-transform: uppercase; color: var(--muted); }
+  h2 { margin: 0; font: 700 clamp(30px, 3.6vw, 42px)/1 var(--cond); font-stretch: 72%; }
+  .sbody { display: grid; grid-template-columns: 200px minmax(0, 1fr); gap: 40px; margin-top: 30px; }
+  .sbody > :first-child { font-size: 14px; color: var(--muted); }
+
+  .steps { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); border-top: 2px solid var(--text); }
+  .steps li { padding: 18px 24px 4px 0; }
+  .steps li + li { padding-left: 24px; border-left: 1px solid var(--line); }
+  .steps .n { font: 700 40px/1 var(--cond); font-stretch: 72%; color: var(--accent); }
+  .steps h3 { margin: 10px 0 6px; font: 600 18px/1.25 var(--sans); }
+  .steps p { margin: 0; font-size: 15px; color: var(--text-2); }
+  .steps .fine { margin-top: 10px; font-size: 13px; color: var(--muted); }
+
+  /* manifest: what goes on the machine, set like an evidence inventory */
+  table.manifest { width: 100%; border-collapse: collapse; font-size: 15px; }
+  .manifest th { text-align: left; font: 600 12px/1 var(--sans); letter-spacing: 0.1em; text-transform: uppercase; color: var(--muted); padding: 0 16px 10px 0; border-bottom: 2px solid var(--text); }
+  .manifest td { padding: 13px 16px 13px 0; border-bottom: 1px solid var(--line); vertical-align: top; }
+  .manifest td:first-child { width: 2.2em; font: 600 13px/1.6 var(--mono); color: var(--muted); }
+  .manifest td.what { font-weight: 600; width: 30%; }
+  .manifest td.where { font: 13.5px/1.6 var(--mono); color: var(--text-2); width: 28%; overflow-wrap: anywhere; }
+  .manifest td.note { color: var(--text-2); }
+  .tag { display: inline-block; margin-left: 6px; padding: 1px 7px; border: 1px solid currentColor; border-radius: 999px; font: 500 11.5px/1.4 var(--sans); vertical-align: 1px; }
+  .tag.opt { color: var(--med); }
+  .removal { margin-top: 18px; font-size: 15px; color: var(--text-2); }
+  .removal code { font-size: 13.5px; background: var(--surface); padding: 2px 6px; border: 1px solid var(--line-soft); }
+
+  /* detections: an index by tactic */
+  .index { columns: 2; column-gap: 48px; }
+  .tactic { break-inside: avoid; margin: 0 0 26px; }
+  .tactic h3 { display: flex; align-items: baseline; gap: 10px; margin: 0 0 8px; padding-bottom: 6px; border-bottom: 2px solid var(--text); font: 700 21px/1 var(--cond); font-stretch: 78%; }
+  .tactic h3 span { margin-left: auto; font: 500 13px/1 var(--mono); color: var(--muted); }
+  .tactic ul { list-style: none; margin: 0; padding: 0; }
+  .tactic li { display: flex; gap: 12px; padding: 6px 0; border-bottom: 1px solid var(--line-soft); font-size: 15px; }
+  .tactic li code { flex: none; width: 6.6em; font-size: 12.5px; line-height: 1.85; color: var(--muted); }
+
+  .faq { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 0 48px; }
+  .faq div { padding: 16px 0; border-top: 1px solid var(--line); }
+  .faq h3 { margin: 0 0 6px; font: 600 16px/1.35 var(--sans); }
+  .faq p { margin: 0; font-size: 15px; color: var(--text-2); }
+
+  footer { padding: 28px 0 40px; font-size: 13.5px; color: var(--muted); }
+  footer .wrap { display: flex; flex-wrap: wrap; gap: 8px 24px; }
+  footer .wrap span:last-child { margin-left: auto; }
+
+  :focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+  @media (max-width: 980px) {
+    .hero .wrap { grid-template-columns: minmax(0, 1fr); gap: 40px; }
+    .hero .wrap > * { min-width: 0; }
+    .shead, .sbody { grid-template-columns: 1fr; gap: 10px; }
+    .sbody { margin-top: 22px; }
+    .steps { grid-template-columns: 1fr; }
+    .steps li + li { padding-left: 0; border-left: 0; border-top: 1px solid var(--line); }
+    .index { columns: 1; }
+    .faq { grid-template-columns: 1fr; }
+    .log { min-height: 0; }
+  }
+  @media (max-width: 640px) {
+    .spine { position: static; flex-direction: row; width: auto; height: 44px; padding: 0 16px; }
+    .spine .vert { writing-mode: horizontal-tb; transform: none; margin: 0 0 0 12px; letter-spacing: 0.24em; }
+    .page { margin-left: 0; }
+    .wrap { padding: 0 16px; }
+    header.top nav { display: none; }
+    .hero { padding: 40px 0; }
+    section.band { padding: 44px 0; }
+    .manifest td.where { display: none; }
+    .manifest th:nth-child(3) { display: none; }
+    .tactic li code { width: 5.6em; }
+    .log { font-size: 12px; padding: 14px; }
+  }
+  @media (prefers-reduced-motion: reduce) { .log .cur::after { animation: none; } }
+</style>
+</head>
+<body>
+<aside class="spine" aria-hidden="true">
+  <svg viewBox="0 0 32 32"><path d="M16 3 5 7v8c0 6.6 4.6 12.4 11 14 6.4-1.6 11-7.4 11-14V7z" fill="currentColor" opacity=".92"/><path d="m11 16 3.6 3.6L21.5 12.6" fill="none" stroke="var(--spine)" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg>
+  <div class="vert"><b>Aegis</b> &nbsp;·&nbsp; endpoint kit</div>
+</aside>
+
+<div class="page">
+  <header class="top">
+    <div class="wrap">
+      <span class="brand">AEGIS</span>
+      <nav aria-label="Sections">
+        <a href="#how">How it works</a>
+        <a href="#installs">What it installs</a>
+        <a href="#detects">What it catches</a>
+        <a href="#faq">Questions</a>
+      </nav>
+    </div>
+  </header>
+
+  <main>
+    <section class="hero">
+      <div class="wrap">
+        <div>
+          <div class="kicker">Windows endpoint agent</div>
+          <h1>Put a witness on every <em>Windows</em> machine.</h1>
+          <p class="lede">
+            Aegis watches process, network, credential and script activity and reports it to the Aegis console
+            running on your own network. Setup finds the console by itself. You approve the machine, and it's covered
+            in about half a minute.
+          </p>
+
+          <div class="get">
+            <a class="btn" href="Aegis-Setup.zip" download id="dl">
+              <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3v12m0 0-4.5-4.5M12 15l4.5-4.5M4 17v3h16v-3" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+              <span>Download Aegis Setup<small>for Windows 10 and 11 · x64 and ARM64</small></span>
+            </a>
+            <div class="meta">Aegis-Setup.zip · 4 KB · unzip, then double-click <code>Aegis-Setup.cmd</code></div>
+            <p class="notwin" id="notwin">You're on a different system. Open this page on the Windows machine you want to protect.</p>
+          </div>
+
+          <div class="oneliner">
+            <p>Or in PowerShell on that machine:</p>
+            <div class="cmd">
+              <code id="cmd">irm https://this-site/setup.ps1 | iex</code>
+              <button type="button" id="copy">Copy</button>
+            </div>
+          </div>
+        </div>
+
+        <figure class="sheet" style="margin:0" aria-label="What setup prints on the laptop">
+          <div class="bar"><b>Aegis-Setup.cmd</b> on LAPTOP-7 <span class="t" id="clock">0.0 s</span></div>
+          <pre class="log" id="log"></pre>
+        </figure>
+      </div>
+    </section>
+
+    <section class="band" id="how">
+      <div class="wrap">
+        <div class="shead"><div class="no">01 · How it works</div><h2>Three steps, one of them yours.</h2></div>
+        <div class="sbody">
+          <div>Nothing to configure. The laptop needs to be on the same network as the console.</div>
+          <ol class="steps">
+            <li>
+              <div class="n">1</div>
+              <h3>It finds your console</h3>
+              <p>Setup broadcasts on the local network. If nothing answers, it checks the nearby addresses for an Aegis console.</p>
+              <p class="fine">No address or enrollment code to type.</p>
+            </li>
+            <li>
+              <div class="n">2</div>
+              <h3>You approve it</h3>
+              <p>The machine shows up on the console under Endpoints with its name, user and IP. Click Approve.</p>
+              <p class="fine">Or switch on auto-approve for a lab you trust.</p>
+            </li>
+            <li>
+              <div class="n">3</div>
+              <h3>It installs and reports</h3>
+              <p>The console sends the installer. Each step appears live on the console until the first events arrive.</p>
+              <p class="fine">Usually under 30 seconds on a local network.</p>
+            </li>
+          </ol>
+        </div>
+      </div>
+    </section>
+
+    <section class="band" id="installs">
+      <div class="wrap">
+        <div class="shead"><div class="no">02 · What it installs</div><h2>Everything it touches, and how it leaves.</h2></div>
+        <div class="sbody">
+          <div>All files come from your console, not from the internet. This page only hosts the 4 KB launcher.</div>
+          <div>
+            <table class="manifest">
+              <thead><tr><th>#</th><th>Item</th><th>Where</th><th>Notes</th></tr></thead>
+              <tbody>
+                <tr><td>01</td><td class="what">Agent and private Python runtime</td><td class="where">C:\Program Files\Aegis</td><td class="note">Self-contained. Doesn't add Python to the system or change PATH.</td></tr>
+                <tr><td>02</td><td class="what">Sysmon <span class="tag opt">optional</span></td><td class="where">Microsoft-Windows-Sysmon</td><td class="note">Process, network and LSASS-access telemetry. Kept as-is if already installed; skipped if another security product blocks it.</td></tr>
+                <tr><td>03</td><td class="what">Audit and PowerShell logging</td><td class="where">auditpol · script block logging</td><td class="note">The previous audit policy is backed up first and restored on removal.</td></tr>
+                <tr><td>04</td><td class="what">Aegis Agent task</td><td class="where">Task Scheduler</td><td class="note">Runs as SYSTEM at startup, restarts if it stops, updates itself from the console.</td></tr>
+              </tbody>
+            </table>
+            <p class="removal">To remove it, use <b>Remove</b> on the host in the console, or run <code>&amp; "C:\Program Files\Aegis\uninstall.ps1"</code>.
+              Sysmon is only uninstalled if Aegis installed it.</p>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section class="band" id="detects">
+      <div class="wrap">
+        <div class="shead"><div class="no">03 · What it catches</div><h2>23 detections, mapped to ATT&amp;CK.</h2></div>
+        <div class="sbody">
+          <div>Matched on the console as events arrive. An analyst can kill the process from the alert.</div>
+          <div class="index">
+            <div class="tactic"><h3>Credential access <span>6</span></h3><ul>
+              <li><code>T1003.001</code>LSASS memory access</li>
+              <li><code>T1003.001</code>LSASS dump via command line</li>
+              <li><code>T1003</code>Mimikatz keywords in PowerShell</li>
+              <li><code>T1110.001</code>Brute-force logon attempts</li>
+              <li><code>T1110.003</code>Password spray</li>
+              <li><code>T1110</code>Account locked out</li>
+            </ul></div>
+            <div class="tactic"><h3>Defense evasion <span>6</span></h3><ul>
+              <li><code>T1070.001</code>Security event log cleared</li>
+              <li><code>T1070.001</code>Event log cleared</li>
+              <li><code>T1562.001</code>Defender real-time protection disabled</li>
+              <li><code>T1562.001</code>Defender tampering via command line</li>
+              <li><code>T1562.002</code>Audit policy changed</li>
+              <li><code>T1204</code>Defender detected malware</li>
+            </ul></div>
+            <div class="tactic"><h3>Execution <span>4</span></h3><ul>
+              <li><code>T1059.001</code>Encoded PowerShell command</li>
+              <li><code>T1059.001</code>PowerShell download cradle</li>
+              <li><code>T1204.002</code>Office or browser spawned a shell</li>
+              <li><code>T1218</code>LOLBin downloading or running remote code</li>
+            </ul></div>
+            <div class="tactic"><h3>Persistence &amp; privilege <span>5</span></h3><ul>
+              <li><code>T1136.001</code>Local user account created</li>
+              <li><code>T1098</code>User added to privileged group</li>
+              <li><code>T1543.003</code>New service installed</li>
+              <li><code>T1053.005</code>Scheduled task created</li>
+              <li><code>T1547.001</code>Registry Run key persistence</li>
+            </ul></div>
+            <div class="tactic"><h3>Discovery &amp; impact <span>2</span></h3><ul>
+              <li><code>T1082</code>Burst of reconnaissance commands</li>
+              <li><code>T1490</code>Shadow copies deleted, recovery disabled</li>
+            </ul></div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section class="band" id="faq">
+      <div class="wrap">
+        <div class="shead"><div class="no">04 · Questions</div><h2>Before you run it.</h2></div>
+        <div class="sbody">
+          <div>Requirements: Windows 10 or 11, 64-bit (x64 or ARM64), an administrator account, and the same network as the console.</div>
+          <div class="faq">
+            <div><h3>Windows says it “protected your PC”.</h3><p>The launcher isn't code-signed yet. Click <b>More info</b>, then <b>Run anyway</b>. You can read the whole script first: it's <a href="setup.ps1">setup.ps1</a>, about 175 lines.</p></div>
+            <div><h3>Where does my data go?</h3><p>Only to the console you approve on your own network. This site never receives events, and setup talks to nothing else.</p></div>
+            <div><h3>Setup can't find the console.</h3><p>Check the console is running and that both machines are on the same network or VPN. Setup then asks for the address, for example <code>192.168.1.20:8000</code>.</p></div>
+            <div><h3>Why does it ask for administrator rights?</h3><p>Reading the Security log, installing Sysmon and setting audit policy all need them. Windows asks once, when setup starts.</p></div>
+            <div><h3>It's a work laptop with another EDR.</h3><p>That's fine. If the other product blocks Sysmon, that step is skipped and Aegis carries on with the Security, PowerShell and System logs.</p></div>
+            <div><h3>Can someone enroll a machine I don't know about?</h3><p>Not by default. Every machine waits for an analyst to approve it on the console, unless you turn auto-approve on.</p></div>
+          </div>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <footer>
+    <div class="wrap">
+      <span>Aegis · Windows SIEM + EDR</span>
+      <span>The console runs on your own machine; this page only hosts the launcher.</span>
+    </div>
+  </footer>
+</div>
+
+<script>
+  // one-liner points at wherever this page is deployed
+  (function () {
+    var origin = /^https?:/.test(location.protocol) ? location.origin + location.pathname.replace(/[^/]*$/, "") : "https://this-site/";
+    var cmd = document.getElementById("cmd");
+    cmd.textContent = "irm " + origin + "setup.ps1 | iex";
+    var btn = document.getElementById("copy");
+    btn.addEventListener("click", function () {
+      var done = function () { btn.textContent = "Copied"; btn.classList.add("done"); setTimeout(function () { btn.textContent = "Copy"; btn.classList.remove("done"); }, 1600); };
+      if (navigator.clipboard) navigator.clipboard.writeText(cmd.textContent).then(done, function () { selectCmd(); });
+      else selectCmd();
+    });
+    function selectCmd() { var r = document.createRange(); r.selectNodeContents(cmd); var s = getSelection(); s.removeAllRanges(); s.addRange(r); }
+
+    var ua = navigator.userAgent || "";
+    if (!/Windows/i.test(ua)) document.getElementById("notwin").style.display = "block";
+  })();
+
+  // the transcript: the lines setup and the installer really print, replayed with their real pacing
+  (function () {
+    var C = "http://192.168.1.9:8000";
+    var L = [
+      [0, "hd", "  AEGIS  endpoint setup"],
+      [0, "dim", "  LAPTOP-7, looking for the Aegis console on this network"],
+      [0, "", ""],
+      [400, "", "  Broadcasting for a console...        ", [900, "ok", "found"]],
+      [100, "dim", "  Console: SOC-MAC  " + C],
+      [0, "", ""],
+      [300, "warn", "  Waiting for approval. On the console, open"],
+      [0, "warn", "  Endpoints and approve LAPTOP-7 ", [0, "dim", "....", 1900]],
+      [200, "ok", "  Approved. Starting the installer..."],
+      [0, "", ""],
+      [300, "", "  [1/6] Contacting console              ", [300, "ok", "ok"]],
+      [100, "", "  [2/6] Installing agent runtime        ", [2600, "ok", "ok"]],
+      [100, "", "  [3/6] Enrolling this endpoint         ", [400, "ok", "ok"]],
+      [100, "", "  [4/6] Installing Sysmon               ", [3000, "ok", "ok"]],
+      [100, "", "  [5/6] Enabling audit + script logging ", [900, "ok", "ok"]],
+      [100, "", "  [6/6] Starting the agent service      ", [1200, "ok", "ok"]],
+      [0, "", ""],
+      [200, "", "  Waiting for the agent to check in", [0, "dim", "...", 1500]],
+      [0, "", ""],
+      [200, "good", "  LAPTOP-7 is protected."],
+      [0, "dim", "  Reporting to " + C],
+      [0, "dim", "  Uninstall any time:"],
+      [0, "dim", "  & \"C:\\Program Files\\Aegis\\uninstall.ps1\""]
+    ];
+    var log = document.getElementById("log"), clock = document.getElementById("clock");
+    var reduce = matchMedia("(prefers-reduced-motion: reduce)").matches;
+    function span(cls, text) { var s = document.createElement("span"); if (cls) s.className = cls; s.textContent = text; return s; }
+
+    if (reduce) {
+      L.forEach(function (l) { var d = span("l " + l[1], l[2]); if (l[3]) d.appendChild(span(l[3][1], l[3][2])); log.appendChild(d); });
+      clock.textContent = "";
+      return;
+    }
+    var t0, timer;
+    function run() {
+      log.textContent = ""; t0 = performance.now();
+      timer = setInterval(function () { clock.textContent = ((performance.now() - t0) / 1000).toFixed(1) + " s"; }, 100);
+      var i = 0;
+      (function next() {
+        if (i >= L.length) { clearInterval(timer); setTimeout(run, 6000); return; }
+        var l = L[i++];
+        setTimeout(function () {
+          var d = span("l " + l[1], l[2]); log.appendChild(d);
+          if (!l[3]) return next();
+          var tail = l[3]; d.classList.add("cur");
+          if (tail[3]) { // dots ticking while it waits
+            var n = 0, dots = span(tail[1], ""); d.appendChild(dots);
+            var iv = setInterval(function () { dots.textContent += "."; if (++n * 280 >= tail[3]) { clearInterval(iv); d.classList.remove("cur"); next(); } }, 280);
+          } else {
+            setTimeout(function () { d.classList.remove("cur"); d.appendChild(span(tail[1], tail[2])); next(); }, tail[0]);
+          }
+        }, l[0]);
+      })();
+    }
+    var started = false;
+    var io = new IntersectionObserver(function (e) { if (e[0].isIntersecting && !started) { started = true; run(); } });
+    io.observe(log);
+  })();
+</script>
+</body>
+</html>

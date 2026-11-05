@@ -1,0 +1,184 @@
+@import "tailwindcss";
+
+@theme {
+  --font-sans: "Atkinson Hyperlegible Next", ui-sans-serif, system-ui, sans-serif;
+  --font-mono: "Atkinson Hyperlegible Mono", ui-monospace, monospace;
+  --font-cond: "Archivo", "Atkinson Hyperlegible Next", ui-sans-serif, sans-serif;
+
+  /* case file: grey-green evidence paper, ink, a navy spine. Values live on :root below so the theme can flip. */
+  --color-bg: var(--t-bg);
+  --color-surface: var(--t-surface);
+  --color-raised: var(--t-raised);
+  --color-hover: var(--t-hover);
+  --color-line: var(--t-line);
+  --color-line-soft: var(--t-line-soft);
+  --color-text: var(--t-text);
+  --color-text-2: var(--t-text-2);
+  --color-muted: var(--t-muted);
+  --color-accent: var(--t-accent);
+  --color-spine: var(--t-spine);
+  --color-spine-ink: var(--t-spine-ink);
+  --color-spine-muted: var(--t-spine-muted);
+  --color-spine-on: var(--t-spine-on);
+
+  --color-crit: var(--t-crit);
+  --color-high: var(--t-high);
+  --color-med: var(--t-med);
+  --color-low: var(--t-low);
+  --color-ok: var(--t-ok);
+
+  /* aliases kept for older components */
+  --color-danger: var(--t-crit);
+  --color-warn: var(--t-med);
+  --color-panel: var(--t-surface);
+  --color-panel-2: var(--t-raised);
+
+  /* paper has corners: almost square, only pills stay round */
+  --radius-xs: 1px;
+  --radius-sm: 1px;
+  --radius: 2px;
+  --radius-md: 2px;
+  --radius-lg: 3px;
+  --radius-xl: 4px;
+}
+
+:root {
+  color-scheme: light;
+  --t-bg: #f3f4ef;
+  --t-surface: #e9ebe4;
+  --t-raised: #e0e3db;
+  --t-hover: #d9ddd3;
+  --t-line: #c6cbc0;
+  --t-line-soft: #dadfd4;
+  --t-text: #15181b;
+  --t-text-2: #3f464d;
+  --t-muted: #646b72;
+  --t-accent: #1f3d66;
+  --t-spine: #172a45;
+  --t-spine-ink: #f3f4ef;
+  --t-spine-muted: #8d9bb0;
+  --t-spine-on: #2a4268;
+
+  --t-crit: #bf1131;
+  --t-high: #bd4f08;
+  --t-med: #8c6800;
+  --t-low: #275fa5;
+  --t-ok: #1f7446;
+
+  /* telemetry categories */
+  --c-process: #3a62a6;
+  --c-network: #0f7c76;
+  --c-dns: #3a8549;
+  --c-file: #7150b3;
+  --c-registry: #8c6a0c;
+  --c-auth: #84750d;
+  --c-account: #ab561c;
+  --c-persistence: #a83775;
+  --c-script: #4750b4;
+  --c-other: #6b727a;
+  --shadow: rgb(21 24 27 / 0.16);
+}
+
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  --t-bg: #0d1014;
+  --t-surface: #13171d;
+  --t-raised: #1a1f27;
+  --t-hover: #1e242d;
+  --t-line: #232933;
+  --t-line-soft: #1b2028;
+  --t-text: #e4e8ee;
+  --t-text-2: #a7afbc;
+  --t-muted: #6c7584;
+  --t-accent: #93a9ff;
+  --t-spine: #13171d;
+  --t-spine-ink: #e4e8ee;
+  --t-spine-muted: #6c7584;
+  --t-spine-on: #1e242d;
+
+  --t-crit: #f2506b;
+  --t-high: #f28c4e;
+  --t-med: #e6b94f;
+  --t-low: #6fa8e8;
+  --t-ok: #4fc48d;
+
+  --c-process: #7fa7e6;
+  --c-network: #5fc3b8;
+  --c-dns: #86c79a;
+  --c-file: #b49be0;
+  --c-registry: #d9b25f;
+  --c-auth: #d6c46a;
+  --c-account: #e09a6c;
+  --c-persistence: #e08ab4;
+  --c-script: #9aa3f0;
+  --c-other: #8b94a3;
+  --shadow: rgb(0 0 0 / 0.5);
+}
+
+/* evidence-label headings: Archivo pulled narrow */
+.font-cond { font-stretch: 72%; letter-spacing: -0.005em; }
+
+html, body, #root { height: 100%; }
+body {
+  margin: 0;
+  background: var(--color-bg);
+  color: var(--color-text);
+  font-family: var(--font-sans);
+  font-size: 13.5px;
+  line-height: 1.45;
+  -webkit-font-smoothing: antialiased;
+  font-feature-settings: "tnum" 1;
+}
+
+:focus-visible { outline: 2px solid var(--color-accent); outline-offset: 2px; border-radius: 4px; }
+::selection { background: color-mix(in srgb, var(--color-accent) 25%, transparent); }
+
+::-webkit-scrollbar { width: 10px; height: 10px; }
+::-webkit-scrollbar-thumb { background: var(--color-line); border-radius: 6px; border: 3px solid var(--color-bg); }
+::-webkit-scrollbar-track { background: transparent; }
+
+/* new telemetry row: a brief accent wash */
+@keyframes row-new { from { background-color: color-mix(in srgb, var(--color-accent) 12%, transparent); } to { background-color: transparent; } }
+.row-new { animation: row-new 1.4s ease-out; }
+
+/* new alert row: severity wash, set via --sev */
+@keyframes row-alert { from { background-color: color-mix(in srgb, var(--sev) 22%, transparent); } to { background-color: transparent; } }
+.row-alert { animation: row-alert 3s ease-out; }
+
+@keyframes live-ring {
+  0% { box-shadow: 0 0 0 0 color-mix(in srgb, currentColor 55%, transparent); }
+  70%, 100% { box-shadow: 0 0 0 6px transparent; }
+}
+.live-ring { animation: live-ring 2.2s ease-out infinite; }
+
+/* critical alert lands: a single red vignette, then gone */
+@keyframes crit-vignette {
+  0% { box-shadow: inset 0 0 0 0 transparent; }
+  18% { box-shadow: inset 0 0 0 2px color-mix(in srgb, var(--color-crit) 90%, transparent), inset 0 0 160px color-mix(in srgb, var(--color-crit) 22%, transparent); }
+  100% { box-shadow: inset 0 0 0 0 transparent; }
+}
+.crit-flash { animation: crit-vignette 2.2s ease-out forwards; }
+
+@keyframes toast-in { from { transform: translateY(12px); opacity: 0; } to { transform: none; opacity: 1; } }
+.toast-in { animation: toast-in .28s cubic-bezier(.2,.8,.2,1); }
+
+/* containment stamp on the attack story */
+@keyframes stamp { 0% { transform: scale(1.4) rotate(-6deg); opacity: 0; } 60% { opacity: 1; } 100% { transform: rotate(-6deg); opacity: 1; } }
+.stamp { animation: stamp .45s cubic-bezier(.2,.9,.3,1.2) both; }
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { animation-duration: 1ms !important; animation-iteration-count: 1 !important; transition-duration: 1ms !important; }
+}
+
+/* process graph: edges draw in, nodes settle, once per incident */
+@keyframes draw { from { stroke-dashoffset: 1; } to { stroke-dashoffset: 0; } }
+.edge-draw { stroke-dasharray: 1; stroke-dashoffset: 1; animation: draw .5s cubic-bezier(.4,0,.2,1) forwards; }
+@keyframes node-in { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: none; } }
+.node-in { opacity: 0; animation: node-in .35s ease-out forwards; }
+
+/* incident arrival: the detail pane slides in from the right edge */
+@keyframes arrive { from { opacity: 0; transform: translateX(16px); } to { opacity: 1; transform: none; } }
+.arrive { animation: arrive .4s cubic-bezier(.2,.8,.2,1); }
+
+@keyframes marker-pop { 0% { transform: scale(0); } 70% { transform: scale(1.35); } 100% { transform: scale(1); } }
+.marker-pop { transform-box: fill-box; transform-origin: center; animation: marker-pop .5s cubic-bezier(.2,.9,.3,1.3); }
