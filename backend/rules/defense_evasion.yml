@@ -1,0 +1,61 @@
+id: EVA-001
+title: Security event log cleared
+description: The Security audit log was cleared, usually to cover tracks.
+severity: critical
+mitre: {tactic: Defense Evasion, technique: T1070.001, name: "Indicator Removal: Clear Windows Event Logs"}
+match:
+  channel: security
+  event_id: 1102
+alert: "Security log cleared by {SubjectUserName}"
+---
+id: EVA-002
+title: Event log cleared
+description: A Windows event log was cleared.
+severity: high
+mitre: {tactic: Defense Evasion, technique: T1070.001, name: "Indicator Removal: Clear Windows Event Logs"}
+match:
+  channel: system
+  event_id: 104
+alert: "Event log cleared: {Channel}"
+---
+id: EVA-003
+title: Defender real-time protection disabled
+description: Microsoft Defender real-time protection was turned off.
+severity: high
+mitre: {tactic: Defense Evasion, technique: T1562.001, name: "Impair Defenses: Disable or Modify Tools"}
+match:
+  channel: defender
+  event_id: 5001
+alert: "Defender real-time protection disabled"
+---
+id: EVA-004
+title: Defender tampering via command line
+description: A command disables Defender or adds an exclusion (Set-MpPreference / Add-MpPreference / registry).
+severity: high
+mitre: {tactic: Defense Evasion, technique: T1562.001, name: "Impair Defenses: Disable or Modify Tools"}
+match:
+  channel: sysmon
+  event_id: 1
+  where:
+    CommandLine|re: '((set|add)-mppreference.*(disable|exclusion)|windows defender.*disableantispyware|sc(\.exe)?\s+(stop|delete|config)\s+windefend)'
+alert: "Defender tampering: {CommandLine}"
+---
+id: EVA-005
+title: Audit policy changed
+description: The system audit policy was modified, which can blind the SIEM.
+severity: medium
+mitre: {tactic: Defense Evasion, technique: T1562.002, name: "Impair Defenses: Disable Windows Event Logging"}
+match:
+  channel: security
+  event_id: 4719
+alert: "Audit policy changed by {SubjectUserName}"
+---
+id: EVA-006
+title: Defender detected malware
+description: Microsoft Defender detected a threat on the endpoint.
+severity: high
+mitre: {tactic: Execution, technique: T1204, name: User Execution}
+match:
+  channel: defender
+  event_id: 1116
+alert: "Defender detected {Threat Name}"

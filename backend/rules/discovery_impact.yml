@@ -1,0 +1,35 @@
+id: DISC-001
+title: Burst of reconnaissance commands
+description: Three or more different discovery utilities ran on one host within two minutes, typical of hands-on-keyboard recon after compromise.
+severity: medium
+mitre: {tactic: Discovery, technique: T1082, name: System Information Discovery}
+match:
+  channel: sysmon
+  event_id: 1
+  where:
+    Image|endswith: [\whoami.exe, \net.exe, \systeminfo.exe, \ipconfig.exe, \nltest.exe, \quser.exe,
+                     \tasklist.exe, \arp.exe, \netstat.exe, \hostname.exe, \route.exe, \qwinsta.exe]
+threshold: {count: 3, window: 120, distinct: Image}
+alert: "Recon burst: {count} discovery commands (last: {CommandLine})"
+---
+id: IMP-001
+title: Shadow copies deleted / recovery disabled
+description: Volume shadow copies were deleted or boot recovery disabled - a hallmark of ransomware right before encryption.
+severity: critical
+mitre: {tactic: Impact, technique: T1490, name: Inhibit System Recovery}
+match:
+  channel: sysmon
+  event_id: 1
+  where:
+    CommandLine|re: '(vssadmin.*delete\s+shadows|wmic.*shadowcopy.*delete|bcdedit.*recoveryenabled\s+no|wbadmin.*delete\s+catalog|get-wmiobject.*win32_shadowcopy.*delete)'
+alert: "Ransomware precursor: {CommandLine}"
+---
+id: IMP-002
+title: Ransomware canary tripped
+description: A decoy document planted by the agent was encrypted, renamed or deleted. Nothing legitimate touches these files, so the process doing it is treated as ransomware and killed on the endpoint without waiting for the console.
+severity: critical
+mitre: {tactic: Impact, technique: T1486, name: Data Encrypted for Impact}
+match:
+  channel: canary
+  event_id: 1
+alert: "{Headline}"

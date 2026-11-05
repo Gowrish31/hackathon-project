@@ -1,0 +1,53 @@
+id: EXEC-001
+title: Encoded PowerShell command
+description: PowerShell launched with a base64-encoded command, commonly used to hide malicious payloads.
+severity: high
+mitre: {tactic: Execution, technique: T1059.001, name: "Command and Scripting Interpreter: PowerShell"}
+match:
+  channel: sysmon
+  event_id: 1
+  where:
+    Image|endswith: [\powershell.exe, \pwsh.exe]
+    CommandLine|re: '\s[-/]e[a-z]*\s+[A-Za-z0-9+/=]{16,}'
+alert: "Encoded PowerShell launched by {ParentImage}"
+---
+id: EXEC-002
+title: PowerShell download cradle
+description: A script block downloads and runs code from the network (IEX + WebClient / Invoke-WebRequest).
+severity: high
+mitre: {tactic: Execution, technique: T1059.001, name: "Command and Scripting Interpreter: PowerShell"}
+match:
+  channel: powershell
+  event_id: 4104
+  where:
+    ScriptBlockText|re: '(downloadstring|downloaddata|downloadfile|net\.webclient|invoke-webrequest|\biwr\b|start-bitstransfer).*'
+  not:
+    ScriptBlockText|contains: [Get-WinEvent]
+alert: "PowerShell download activity"
+---
+id: EXEC-003
+title: Office or browser spawned a shell
+description: A document or browser process started a command interpreter, typical of a malicious macro or exploit.
+severity: high
+mitre: {tactic: Execution, technique: T1204.002, name: "User Execution: Malicious File"}
+match:
+  channel: sysmon
+  event_id: 1
+  where:
+    ParentImage|endswith: [\winword.exe, \excel.exe, \powerpnt.exe, \outlook.exe, \msaccess.exe, \mspub.exe,
+                           \acrord32.exe, \chrome.exe, \msedge.exe, \firefox.exe, \iexplore.exe]
+    Image|endswith: [\cmd.exe, \powershell.exe, \pwsh.exe, \wscript.exe, \cscript.exe, \mshta.exe,
+                     \rundll32.exe, \regsvr32.exe, \certutil.exe, \bitsadmin.exe]
+alert: "{ParentImage} spawned {Image}"
+---
+id: EXEC-004
+title: LOLBin used to download or execute remote code
+description: A signed Windows binary (certutil, bitsadmin, mshta, regsvr32, rundll32) was used to fetch or run remote content.
+severity: high
+mitre: {tactic: Defense Evasion, technique: T1218, name: System Binary Proxy Execution}
+match:
+  channel: sysmon
+  event_id: 1
+  where:
+    CommandLine|re: '(certutil.*(urlcache|-split|verifyctl).*https?://|bitsadmin.*/transfer|mshta(\.exe)?\s+(https?|javascript|vbscript):|regsvr32.*/i:\s*https?://|rundll32.*javascript:)'
+alert: "LOLBin remote execution: {CommandLine}"

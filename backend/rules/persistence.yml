@@ -1,0 +1,58 @@
+id: PERS-001
+title: Local user account created
+description: A new local user account was created.
+severity: medium
+mitre: {tactic: Persistence, technique: T1136.001, name: "Create Account: Local Account"}
+match:
+  channel: security
+  event_id: 4720
+alert: "User {TargetUserName} created by {SubjectUserName}"
+---
+id: PERS-002
+title: User added to privileged group
+description: An account was added to a privileged local or domain group (Administrators, Remote Desktop Users, Domain Admins...).
+severity: high
+mitre: {tactic: Privilege Escalation, technique: T1098, name: Account Manipulation}
+match:
+  channel: security
+  event_id: [4728, 4732, 4756]
+  where:
+    TargetUserName|re: '(administrators|remote desktop users|domain admins|enterprise admins|backup operators)'
+alert: "{MemberName} added to {TargetUserName} by {SubjectUserName}"
+---
+id: PERS-003
+title: New service installed
+description: A new Windows service was installed, a common persistence and lateral movement technique (PsExec, Metasploit).
+severity: medium
+mitre: {tactic: Persistence, technique: T1543.003, name: "Create or Modify System Process: Windows Service"}
+match:
+  channel: system
+  event_id: 7045
+alert: "Service installed: {ServiceName} -> {ImagePath}"
+---
+id: PERS-004
+title: Scheduled task created
+description: A scheduled task was registered.
+severity: medium
+mitre: {tactic: Persistence, technique: T1053.005, name: "Scheduled Task/Job: Scheduled Task"}
+match:
+  channel: security
+  event_id: 4698
+  not:
+    # Windows' own tasks; these live outside \Microsoft\ and are created during normal sign-in
+    TaskName|startswith: ['\Microsoft\', '\SoftLanding\', '\PlatformExperiencesHelper', '\MicrosoftEdgeUpdateTask', '\OneDrive ', '\CreateExplorerShellUnelevatedTask']
+alert: "Scheduled task {TaskName} created by {SubjectUserName}"
+---
+id: PERS-005
+title: Registry Run key persistence
+description: A value was written to an autostart Run/RunOnce registry key.
+severity: medium
+mitre: {tactic: Persistence, technique: T1547.001, name: "Boot or Logon Autostart: Registry Run Keys"}
+match:
+  channel: sysmon
+  event_id: 13
+  where:
+    TargetObject|re: '\\currentversion\\(run|runonce|runservices)\\'
+  not:
+    Image|endswith: [\msiexec.exe, \TrustedInstaller.exe, \OneDriveSetup.exe]
+alert: "{Image} set autostart {TargetObject}"

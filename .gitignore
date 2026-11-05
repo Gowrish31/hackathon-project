@@ -1,0 +1,17 @@
+__pycache__/
+*.pyc
+.venv/
+node_modules/
+dashboard/dist/
+backend/*.db
+backend/*.db-*
+agent/agent_id.txt
+agent/build/
+agent/dist/
+*.spec
+.DS_Store
+agent.zip
+backend/payload/
+
+*.key
+.env.local
