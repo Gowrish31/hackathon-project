@@ -25,6 +25,7 @@ from tree import TreeBuilder
 from validation import TESTS, Validator
 from analyst import Analyst
 from judge import Judge
+from device import Devices
 
 AGENT_TOKEN = os.environ.get("AEGIS_TOKEN", "hackathon-demo-token")
 HERE = Path(__file__).parent
@@ -36,6 +37,7 @@ validator = Validator(db)
 enrollment = Enrollment(db)
 analyst = Analyst(db, DB_PATH)
 judge = Judge(db, validator)
+devices = Devices(db)
 
 app = FastAPI(title="Aegis SIEM/EDR")
 app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_methods=["*"], allow_headers=["*"])
@@ -347,6 +349,46 @@ async def judge_run(token: str, body: JudgeRun):
         raise HTTPException(429, r["error"])
     await hub.broadcast({"type": "validation", "validation": r["validation"]})
     return judge.state(s)
+
+
+# ------------------------------------------------------------ "my device" page (for the laptop's owner)
+@app.post("/api/agents/{agent_id}/device_link")
+async def device_link(agent_id: str, rotate: bool = False):
+    """Console only: the private read-only link for one laptop. ?rotate=1 kills the old link."""
+    tok = devices.link(agent_id, rotate)
+    if not tok:
+        raise HTTPException(404, "unknown endpoint")
+    return {"token": tok, "path": f"/device/{tok}"}
+
+
+# public (no console login): the token in the path is the credential
+@app.get("/device/{token}")
+async def device_page(token: str):
+    return FileResponse(HERE / "device.html", media_type="text/html", headers={"Cache-Control": "no-store"})
+
+
+def _device(token: str) -> Dict[str, Any]:
+    a = devices.agent_for(token)
+    if not a:
+        raise HTTPException(404, "This link is no longer valid.")
+    return a
+
+
+@app.get("/api/device/{token}/state")
+async def device_state(token: str):
+    return devices.state(_device(token))
+
+
+@app.post("/api/device/{token}/uninstall")
+async def device_uninstall(token: str):
+    a = _device(token)
+    if (a.get("info") or {}).get("mode") != "service":
+        raise HTTPException(409, "This agent was started by hand, so it cannot remove itself. Ask the security team.")
+    pending = next((c for c in db.list_commands(a["id"], 10)
+                    if c["type"] == "uninstall" and c["status"] in ("pending", "sent")), None)
+    if not pending:
+        await enqueue(a["id"], "uninstall", {"requested_by": "device owner"})
+    return devices.state(a)
 
 
 @app.get("/api/events/{eid}")

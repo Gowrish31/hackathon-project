@@ -49,6 +49,27 @@ export default function Endpoints({ agents, commands, cmdLog, alerts, events, in
 
 const ACTION_NAMES = { kill_process: (c) => `terminate PID ${c.args?.pid}`, run_test: () => "detection drill", update: () => "agent update", uninstall: () => "uninstall", isolate_host: () => "network isolation", release_host: () => "release from isolation" };
 
+/** The laptop owner's read-only page: status, cases, activity and an uninstall button, nothing else. */
+function DeviceLink({ agentId, className }) {
+  const [msg, setMsg] = useState(null);
+  const copy = async () => {
+    try {
+      const r = await api.post(`/api/agents/${agentId}/device_link`, {});
+      if (!r.path) throw new Error(r.detail || "failed");
+      const url = `${location.origin}${r.path}`;
+      try { await navigator.clipboard.writeText(url); setMsg("Link copied"); }
+      catch { window.open(url, "_blank", "noopener"); setMsg("Opened in a new tab"); }
+    } catch { setMsg("Could not make a link"); }
+    setTimeout(() => setMsg(null), 2500);
+  };
+  return (
+    <button onClick={copy} className={className}
+      title="Copy a private read-only page for this laptop's owner: what Aegis sees, plus an uninstall button. No response controls.">
+      {msg || "Device page"}
+    </button>
+  );
+}
+
 function HostCard({ a, cmd, cmdLog, alerts, events, scope, onScope, onOpenAlert }) {
   const [confirm, setConfirm] = useState(false);
   const online = isOnline(a);
@@ -100,6 +121,7 @@ function HostCard({ a, cmd, cmdLog, alerts, events, scope, onScope, onOpenAlert 
                 className={`h-7 rounded-md border px-2.5 text-xs ${scope === a.id ? "border-accent/50 bg-accent/10 text-accent" : "border-line text-text-2 hover:border-text-2/40 hover:text-text"}`}>
                 {scope === a.id ? "Showing this host" : "Focus on host"}
               </button>
+              <DeviceLink agentId={a.id} className={btn} />
               <button onClick={() => setConfirm(true)} disabled={removing} className={`${btn} hover:!border-crit/50 hover:!text-crit`}>Remove</button>
             </>
           )}

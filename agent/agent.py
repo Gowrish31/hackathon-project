@@ -40,7 +40,7 @@ from typing import Any, Dict, List, Optional
 if os.name != "nt":  # pragma: no cover
     sys.exit("The Aegis agent only runs on Windows.")
 
-AGENT_VERSION = "0.4.1"
+AGENT_VERSION = "0.4.2"
 HERE = os.path.dirname(os.path.abspath(__file__))
 CONFIG_PATH = os.path.join(HERE, "config.json")
 TASK_NAME = "Aegis Agent"
@@ -230,7 +230,8 @@ def run_ps(script: str, timeout: float = 60) -> str:
                          capture_output=True, text=True, timeout=timeout,
                          creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0))
     if out.returncode != 0:
-        raise RuntimeError((out.stderr or out.stdout).strip()[:600])
+        msg = (out.stderr or out.stdout or "").strip()
+        raise RuntimeError((msg or f"powershell exited with code {out.returncode} and no output")[:600])
     return out.stdout.strip()
 
 
@@ -973,24 +974,43 @@ class Agent:
         try:
             run_ps(isolation_rules_script(ips))
         except Exception as e:
-            self.release({})
-            return "failed", {"error": f"firewall rules failed: {e}"}
+            err = f"firewall rules failed: {e}"
+            try:
+                self.release({})
+            except Exception as e2:  # keep isolation.json so the failsafe / break-glass can still lift it
+                err += f"; rollback also failed: {e2}"
+            log.error("isolate: %s", err)
+            return "failed", {"error": err}
         probe = tcp_probe("1.1.1.1", 443)
         return "done", {"isolated": True, "console_ips": ips,
                         "probe": "internet blocked" if not probe else "WARNING: 1.1.1.1:443 still reachable"}
 
     def release(self, args: Dict[str, Any]):
         st = isolation_load()
-        run_ps(f"Remove-NetFirewallRule -Group '{ISOLATION_GROUP}' -ErrorAction SilentlyContinue")
+        # 1. the block rules: if this fails we stay "isolated" (state file and pinned console IPs kept),
+        #    so the agent can still reach the console and the failsafe can retry
+        run_ps(f"Get-NetFirewallRule -Group '{ISOLATION_GROUP}' -ErrorAction SilentlyContinue | Remove-NetFirewallRule")
+        left = run_ps(f"@(Get-NetFirewallRule -Group '{ISOLATION_GROUP}' -ErrorAction SilentlyContinue).Count")
+        if left.strip() not in ("", "0"):
+            raise RuntimeError(f"{left.strip()} isolation firewall rules are still in place")
+        # 2. firewall on/off as it was before; best effort, it never blocks the release
+        warnings = []
         for p in (st or {}).get("prior_profiles") or []:
             if p.get("Enabled") in ("True", "False") and p.get("Name"):
-                run_ps(f"Set-NetFirewallProfile -Name '{p['Name']}' -Enabled {p['Enabled']}")
-        PINNED_HOSTS.clear()
+                try:
+                    run_ps(f"Set-NetFirewallProfile -Name '{p['Name']}' -Enabled {p['Enabled']}")
+                except Exception as e:
+                    warnings.append(f"{p['Name']}: {e}")
         try:
             os.remove(ISOLATION_STATE)
         except FileNotFoundError:
             pass
-        return "done", {"isolated": False, "was_isolated": bool(st)}
+        # keep the console pinned: DNS may take a moment to work again, and the pinned IPs are still right.
+        # They are dropped on the next agent restart.
+        out = {"isolated": False, "was_isolated": bool(st)}
+        if warnings:
+            out["warnings"] = warnings
+        return "done", out
 
     def isolation_failsafe(self) -> None:
         if ISOLATION_FAILSAFE_MIN and isolation_load() and time.time() - self.last_contact > ISOLATION_FAILSAFE_MIN * 60:

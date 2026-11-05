@@ -207,9 +207,19 @@ class DB:
             row = self.conn.execute("SELECT * FROM commands WHERE id=?", (cur.lastrowid,)).fetchone()
         return _cmd_row(row)
 
+    SENT_TIMEOUT_S = 150  # longest command (isolation firewall script) is ~60 s; an agent that died mid-command never answers
+
+    def _expire_sent(self, agent_id: str) -> None:
+        """Caller holds the lock. A command the agent picked up but never answered would otherwise spin forever."""
+        cutoff = (datetime.now(timezone.utc) - timedelta(seconds=self.SENT_TIMEOUT_S)).strftime("%Y-%m-%dT%H:%M:%S")
+        self.conn.execute(
+            "UPDATE commands SET status='failed', completed_at=?, result=? WHERE agent_id=? AND status='sent' AND sent_at<?",
+            (now_iso(), json.dumps({"error": "the agent picked this up but never reported back"}), agent_id, cutoff))
+
     def take_pending(self, agent_id: str, max_age_s: int = 60) -> List[Dict[str, Any]]:
         cutoff = (datetime.now(timezone.utc) - timedelta(seconds=max_age_s)).strftime("%Y-%m-%dT%H:%M:%S")
         with self.lock, self.conn:
+            self._expire_sent(agent_id)
             # a kill queued minutes ago must not fire later against a recycled PID
             self.conn.execute(
                 "UPDATE commands SET status='expired', completed_at=? WHERE agent_id=? AND status='pending' AND created_at<?",
@@ -262,7 +272,8 @@ class DB:
                 "fastest_s": round(min(secs), 2) if secs else None}
 
     def list_commands(self, agent_id: str, limit: int = 50) -> List[Dict[str, Any]]:
-        with self.lock:
+        with self.lock, self.conn:
+            self._expire_sent(agent_id)
             rows = self.conn.execute(
                 "SELECT * FROM commands WHERE agent_id=? ORDER BY id DESC LIMIT ?", (agent_id, limit)).fetchall()
         return [_cmd_row(r) for r in rows]

@@ -1,0 +1,258 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="robots" content="noindex">
+<title>Aegis · My device</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Archivo:wdth,wght@62..125,500..800&family=Atkinson+Hyperlegible+Mono:wght@400;500&family=Atkinson+Hyperlegible+Next:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #f3f4ef; --surface: #e9ebe4; --raised: #e0e3db; --line: #c6cbc0; --line-soft: #dadfd4;
+    --text: #15181b; --text-2: #3f464d; --muted: #646b72; --accent: #1f3d66; --spine: #172a45; --spine-ink: #f3f4ef; --spine-muted: #8d9bb0;
+    --crit: #bf1131; --high: #bd4f08; --med: #8c6800; --low: #4a6a8a; --ok: #1f7446;
+    color-scheme: light;
+  }
+  * { box-sizing: border-box; margin: 0; }
+  body { background: var(--bg); color: var(--text); font: 16px/1.45 "Atkinson Hyperlegible Next", system-ui, sans-serif; -webkit-font-smoothing: antialiased; }
+  .mono { font-family: "Atkinson Hyperlegible Mono", ui-monospace, monospace; }
+  .cond { font-family: "Archivo", sans-serif; font-stretch: 85%; }
+  header { background: var(--spine); color: var(--spine-ink); }
+  .wrap { max-width: 980px; margin: 0 auto; padding: 0 16px; }
+  header .wrap { padding-top: 18px; padding-bottom: 22px; }
+  header .brand { font-size: 13px; letter-spacing: .08em; text-transform: uppercase; color: var(--spine-muted); }
+  header h1 { margin-top: 6px; font-size: 32px; font-weight: 700; line-height: 1.1; overflow-wrap: anywhere; }
+  header p { margin-top: 6px; font-size: 14px; color: var(--spine-muted); }
+  .dot { display: inline-block; width: 8px; height: 8px; border-radius: 50%; margin-right: 6px; vertical-align: 1px; background: var(--spine-muted); }
+  .dot.on { background: #4fc183; }
+  main.wrap { padding-top: 20px; padding-bottom: 48px; }
+  h2 { font-size: 13px; font-weight: 700; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); margin: 0 0 10px; }
+  section + section, .grid + section { margin-top: 30px; }
+
+  .state { border: 1px solid var(--line); border-left: 6px solid var(--ok); background: var(--surface); border-radius: 3px; padding: 16px 18px; }
+  .state .big { font-size: 26px; font-weight: 700; line-height: 1.15; }
+  .state .sub { margin-top: 4px; color: var(--text-2); font-size: 15px; }
+  dl.facts { display: grid; grid-template-columns: repeat(auto-fill, minmax(170px, 1fr)); gap: 12px 20px; margin-top: 16px; padding-top: 14px; border-top: 1px solid var(--line-soft); }
+  dl.facts dt { font-size: 12px; color: var(--muted); }
+  dl.facts dd { font-size: 15px; overflow-wrap: anywhere; }
+  .chips { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 14px; }
+  .chip { font-size: 13px; border: 1px solid var(--line); border-radius: 99px; padding: 2px 10px; background: var(--bg); }
+  .chip.off { color: var(--muted); text-decoration: line-through; }
+
+  .grid { display: grid; gap: 30px; }
+  @media (min-width: 860px) { .grid { grid-template-columns: minmax(0, 1.2fr) minmax(0, 1fr); align-items: start; } .grid section + section { margin-top: 0; } }
+
+  .case { border: 1px solid var(--line); border-left: 4px solid var(--sev, var(--line)); background: var(--surface); border-radius: 3px; padding: 12px 14px; }
+  .case + .case { margin-top: 10px; }
+  .case .top { display: flex; gap: 10px; align-items: baseline; }
+  .case .t { font-weight: 700; }
+  .case .when { margin-left: auto; font-size: 12px; color: var(--muted); white-space: nowrap; }
+  .case .meta { font-size: 13px; color: var(--muted); margin-top: 2px; }
+  .case .meta b { font-weight: 700; }
+  .case .resp { margin-top: 8px; color: var(--ok); font-weight: 700; font-size: 14px; }
+  .case .ai { margin-top: 10px; border-left: 3px solid var(--med); padding-left: 10px; }
+  .case .ai .h { font-weight: 700; font-size: 15px; }
+  .case .ai .s { font-size: 14px; color: var(--text-2); margin-top: 3px; }
+  .case details summary { cursor: pointer; font-size: 13px; color: var(--accent); margin-top: 8px; }
+  .case details p { font-size: 14px; color: var(--text-2); margin-top: 6px; }
+  .empty { border: 1px dashed var(--line); border-radius: 3px; padding: 18px; color: var(--text-2); font-size: 15px; }
+
+  .bars { display: flex; height: 8px; border-radius: 2px; overflow: hidden; background: var(--raised); }
+  .legend { display: flex; flex-wrap: wrap; gap: 4px 12px; margin: 8px 0 12px; font-size: 12px; color: var(--muted); }
+  .legend i { display: inline-block; width: 8px; height: 8px; border-radius: 2px; margin-right: 4px; vertical-align: 0; }
+  ol.feed { list-style: none; padding: 0; border-top: 1px solid var(--line-soft); max-height: 560px; overflow-y: auto; }
+  ol.feed li { display: grid; grid-template-columns: 64px 78px minmax(0, 1fr); gap: 8px; padding: 6px 0; border-bottom: 1px solid var(--line-soft); font-size: 13px; align-items: baseline; }
+  ol.feed .ts { color: var(--muted); }
+  ol.feed .cat { font-size: 12px; font-weight: 700; }
+  ol.feed .sum { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  ol.feed li.new { animation: arrive 1.2s ease-out; }
+  @keyframes arrive { from { background: rgba(31,61,102,.12); } to { background: transparent; } }
+  @media (prefers-reduced-motion: reduce) { ol.feed li.new { animation: none; } }
+
+  .remove { border: 1px solid var(--line); border-radius: 3px; padding: 16px 18px; }
+  .remove p { color: var(--text-2); font-size: 15px; max-width: 62ch; }
+  .remove .row { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; margin-top: 14px; }
+  button { font: inherit; border-radius: 3px; padding: 9px 16px; cursor: pointer; border: 1px solid var(--line); background: var(--bg); color: var(--text); }
+  button.danger { background: var(--crit); border-color: var(--crit); color: #fff; font-weight: 700; }
+  button.ghost-danger { color: var(--crit); border-color: color-mix(in srgb, var(--crit) 45%, var(--line)); font-weight: 700; }
+  button:disabled { opacity: .5; cursor: default; }
+  .err { color: var(--crit); font-size: 14px; }
+  .note { font-size: 13px; color: var(--muted); }
+  .gone { padding: 56px 16px; text-align: center; color: var(--text-2); }
+  .gone .cond { font-size: 26px; font-weight: 700; color: var(--text); }
+  footer { padding: 0 16px 40px; text-align: center; font-size: 12px; color: var(--muted); }
+</style>
+</head>
+<body>
+<header><div class="wrap">
+  <div class="brand">Aegis · My device</div>
+  <h1 class="cond" id="host">Loading…</h1>
+  <p id="hostline">Connecting…</p>
+</div></header>
+<main class="wrap" id="app" aria-live="polite"></main>
+<footer>This page only shows what Aegis sees on this laptop. Your security team handles any response.</footer>
+<script>
+(() => {
+  const token = location.pathname.split("/").filter(Boolean).pop();
+  const base = `/api/device/${encodeURIComponent(token)}`;
+  const app = document.getElementById("app");
+  const hostEl = document.getElementById("host");
+  const hostline = document.getElementById("hostline");
+  let state = null, err = "", confirming = false, busy = false, asked = false, timer = null, offline = false;
+  const seen = new Set();
+
+  const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+  const online = (iso) => iso && Date.now() - Date.parse(iso) < 20000;
+  const ago = (iso) => {
+    const s = Math.max(0, (Date.now() - Date.parse(iso)) / 1000);
+    if (isNaN(s)) return "";
+    if (s < 45) return "just now";
+    if (s < 3600) return `${Math.round(s / 60)} min ago`;
+    if (s < 86400) return `${Math.round(s / 3600)} h ago`;
+    return `${Math.round(s / 86400)} d ago`;
+  };
+  const clock = (iso) => { const d = new Date(iso); return isNaN(d) ? "" : d.toLocaleTimeString([], { hour12: false }); };
+  const SEV = { critical: ["Critical", "var(--crit)"], high: ["High", "var(--high)"], medium: ["Medium", "var(--med)"], low: ["Low", "var(--low)"] };
+  const STATUS = { open: "New, being looked at", acknowledged: "Being investigated", contained: "Contained", closed: "Resolved" };
+  const CAT = {
+    process: ["Process", "#1f3d66"], network: ["Network", "#2f6f73"], dns: ["DNS", "#5a7d2a"], file: ["File", "#7a5c1e"],
+    registry: ["Registry", "#6b4f7a"], auth: ["Sign-in", "#8a4b2a"], account: ["Account", "#8a4b2a"], persistence: ["Persistence", "#9a3b5a"],
+    script: ["PowerShell", "#3b5b9a"], injection: ["Injection", "#bf1131"], tamper: ["Tamper", "#bf1131"], av: ["Defender", "#bf1131"],
+    ransomware: ["Ransomware", "#bf1131"], system: ["System", "#7c8288"], other: ["Other", "#7c8288"],
+  };
+  const cat = (c) => CAT[c] || CAT.other;
+  const CHANNEL = {
+    "Microsoft-Windows-Sysmon/Operational": "Programs, network and files (Sysmon)", "Security": "Sign-ins and accounts",
+    "Microsoft-Windows-PowerShell/Operational": "PowerShell scripts", "Microsoft-Windows-Windows Defender/Operational": "Microsoft Defender",
+    "System": "Windows services",
+  };
+
+  async function load() {
+    try {
+      const r = await fetch(`${base}/state`, { cache: "no-store" });
+      if (r.status === 404) return gone();
+      state = await r.json();
+      offline = false;
+      render();
+    } catch { offline = true; hostline.textContent = "Connection lost, retrying…"; }
+    clearTimeout(timer);
+    timer = setTimeout(load, state?.uninstall && state.uninstall.status !== "failed" ? 1500 : 4000);
+  }
+
+  function gone() {
+    clearTimeout(timer);
+    const removed = asked || state?.uninstall;
+    hostEl.textContent = state?.host || "Aegis";
+    hostline.textContent = removed ? "Agent removed" : "Link not valid";
+    app.innerHTML = removed
+      ? `<div class="gone"><p class="cond">Aegis has been removed from this laptop.</p><p style="margin-top:6px">The agent, its scheduled task and Sysmon are gone. This page no longer works.</p></div>`
+      : `<div class="gone"><p class="cond">This link is no longer valid.</p><p style="margin-top:6px">Ask your security team for a new one.</p></div>`;
+  }
+
+  async function uninstall() {
+    if (busy) return;
+    busy = true; err = ""; render();
+    try {
+      const r = await fetch(`${base}/uninstall`, { method: "POST" });
+      const d = await r.json().catch(() => ({}));
+      if (r.status === 404) { asked = true; return gone(); }
+      if (!r.ok) err = d.detail || "That did not work. Try again.";
+      else { state = d; asked = true; confirming = false; }
+    } catch { err = "Network problem. Try again."; }
+    busy = false; render(); load();
+  }
+
+  function stateBlock(s) {
+    const on = online(s.last_seen);
+    const u = s.uninstall && s.uninstall.status !== "failed" && s.uninstall.status !== "expired" ? s.uninstall : null;
+    const active = s.cases.filter((c) => c.status === "open" || c.status === "acknowledged").length;
+    let big, sub, col;
+    if (u) { big = "Removing Aegis…"; sub = u.status === "pending" ? "Waiting for the laptop to pick up the request." : "The laptop is uninstalling the agent and Sysmon."; col = "var(--muted)"; }
+    else if (s.isolated) { big = "Cut off from the network"; sub = "Your security team isolated this laptop while they check something. Only Aegis can still talk to the console."; col = "var(--crit)"; }
+    else if (!on) { big = "Not reporting"; sub = s.last_seen ? `Last heard from ${ago(s.last_seen)}. Is the laptop asleep or offline?` : "Waiting for the first check-in."; col = "var(--muted)"; }
+    else if (active) { big = `Protected · ${active} open case${active === 1 ? "" : "s"}`; sub = "Aegis flagged something on this laptop and the security team is on it."; col = "var(--high)"; }
+    else { big = "Protected"; sub = "Aegis is watching this laptop and sending activity to your security team."; col = "var(--ok)"; }
+    const chans = Object.keys(CHANNEL).filter((k) => k !== "System");
+    return `<div class="state" style="border-left-color:${col}">
+      <div class="big cond" style="color:${col === "var(--muted)" ? "var(--text)" : col}">${esc(big)}</div>
+      <div class="sub">${esc(sub)}</div>
+      <div class="chips">${chans.map((k) => `<span class="chip ${s.channels.includes(k) ? "" : "off"}">${esc(CHANNEL[k])}</span>`).join("")}
+        ${s.canary_armed ? `<span class="chip">Ransomware decoys · ${s.canary_armed} armed</span>` : ""}</div>
+      <dl class="facts">
+        <div><dt>Signed-in user</dt><dd class="mono">${esc(s.user || "unknown")}</dd></div>
+        <div><dt>Windows</dt><dd>${esc(s.os || "unknown")} ${esc(s.arch || "")}</dd></div>
+        <div><dt>IP address</dt><dd class="mono">${esc(s.ip || "unknown")}</dd></div>
+        <div><dt>Agent</dt><dd>${s.version ? `v${esc(s.version)}` : "unknown"}${s.installed ? "" : " · manual run"}</dd></div>
+        <div><dt>Last check-in</dt><dd>${s.last_seen ? esc(ago(s.last_seen)) : "never"}</dd></div>
+        <div><dt>Events sent</dt><dd>${Number(s.events_sent || 0).toLocaleString()}</dd></div>
+      </dl></div>`;
+  }
+
+  function casesBlock(s) {
+    if (!s.cases.length) return `<div class="empty">Nothing suspicious so far. If Aegis spots something, it shows up here.</div>`;
+    return s.cases.map((c) => {
+      const [sl, sc] = SEV[c.severity] || SEV.low;
+      return `<article class="case" style="--sev:${sc}">
+        <div class="top"><span class="t">${esc(c.title)}</span><span class="when" title="${esc(c.created_at)}">${esc(ago(c.created_at))}</span></div>
+        <div class="meta"><b style="color:${sc}">${esc(sl)}</b> · ${esc(STATUS[c.status] || c.status)}${c.technique ? ` · <span class="mono">${esc(c.technique)}</span> ${esc(c.technique_name || "")}` : ""}</div>
+        ${c.response ? `<div class="resp">${esc(c.response)}</div>` : ""}
+        ${c.ai ? `<div class="ai"><div class="h">${esc(c.ai.headline)}</div><div class="s">${esc(c.ai.story)}</div></div>`
+          : c.description ? `<details><summary>What this means</summary><p>${esc(c.description)}</p></details>` : ""}
+      </article>`;
+    }).join("");
+  }
+
+  function activityBlock(s) {
+    const entries = Object.entries(s.categories);
+    const total = entries.reduce((n, [, v]) => n + v, 0) || 1;
+    const bars = entries.map(([k, v]) => `<span style="width:${(v / total) * 100}%;background:${cat(k)[1]}" title="${esc(cat(k)[0])}: ${v}"></span>`).join("");
+    const legend = entries.slice(0, 7).map(([k, v]) => `<span><i style="background:${cat(k)[1]}"></i>${esc(cat(k)[0])} ${v}</span>`).join("");
+    const rows = s.activity.map((e) => {
+      const fresh = seen.size && !seen.has(e.id);
+      return `<li class="${fresh ? "new" : ""}"><span class="ts mono">${esc(clock(e.ts))}</span><span class="cat" style="color:${cat(e.category)[1]}">${esc(cat(e.category)[0])}</span><span class="sum mono" title="${esc(e.summary)}">${esc(e.summary)}</span></li>`;
+    }).join("");
+    s.activity.forEach((e) => seen.add(e.id));
+    if (!s.activity.length) return `<div class="empty">No activity received yet.</div>`;
+    return `<div class="bars">${bars}</div><div class="legend">${legend}</div><ol class="feed">${rows}</ol>`;
+  }
+
+  function removeBlock(s) {
+    const u = s.uninstall && s.uninstall.status !== "failed" && s.uninstall.status !== "expired";
+    const on = online(s.last_seen);
+    let h = `<div class="remove"><p>Uninstalling removes the Aegis agent, its scheduled task, the ransomware decoy files and Sysmon from this laptop. Your security team will see that it was removed, and this page stops working.</p><div class="row">`;
+    if (u) h += `<span class="note">Uninstall requested ${esc(ago(s.uninstall.created_at))}. This takes up to a minute.</span>`;
+    else if (!s.installed) h += `<span class="note">This agent was started by hand, so it cannot remove itself. Ask your security team.</span>`;
+    else if (confirming) h += `<button class="danger" id="yes" ${busy ? "disabled" : ""}>${busy ? "Sending…" : "Yes, uninstall Aegis"}</button><button id="no">Cancel</button>`;
+    else h += `<button class="ghost-danger" id="ask" ${on ? "" : "disabled"}>Uninstall agent</button>${on ? "" : `<span class="note">The laptop has to be online to uninstall.</span>`}`;
+    if (s.uninstall?.status === "failed") h += `<span class="err">The last uninstall attempt failed on the laptop.</span>`;
+    h += `</div>${err ? `<p class="err" role="alert" style="margin-top:10px">${esc(err)}</p>` : ""}</div>`;
+    return h;
+  }
+
+  function render() {
+    if (!state) return;
+    const s = state;
+    const on = online(s.last_seen);
+    document.title = `Aegis · ${s.host}`;
+    hostEl.textContent = s.host || "This laptop";
+    hostline.innerHTML = `<span class="dot ${on && !offline ? "on" : ""}"></span>${on ? "Online" : "Offline"} · ${esc(s.os || "Windows")}${s.first_seen ? ` · protected since ${esc(new Date(s.first_seen).toLocaleDateString())}` : ""}`;
+    const feedScroll = app.querySelector("ol.feed")?.scrollTop || 0;
+    app.innerHTML = `<section>${stateBlock(s)}</section>
+      <div class="grid" style="margin-top:30px">
+        <section><h2>What Aegis caught</h2>${casesBlock(s)}</section>
+        <section><h2>Live activity</h2>${activityBlock(s)}</section>
+      </div>
+      <section><h2>Remove Aegis</h2>${removeBlock(s)}</section>`;
+    const feed = app.querySelector("ol.feed");
+    if (feed) feed.scrollTop = feedScroll;
+    app.querySelector("#ask")?.addEventListener("click", () => { confirming = true; err = ""; render(); });
+    app.querySelector("#no")?.addEventListener("click", () => { confirming = false; render(); });
+    app.querySelector("#yes")?.addEventListener("click", uninstall);
+  }
+  load();
+})();
+</script>
+</body>
+</html>

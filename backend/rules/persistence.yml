@@ -55,4 +55,7 @@ match:
     TargetObject|re: '\\currentversion\\(run|runonce|runservices)\\'
   not:
     Image|endswith: [\msiexec.exe, \TrustedInstaller.exe, \OneDriveSetup.exe]
+    # Edge's own "startup boost": the value it writes always points back at the real msedge.exe
+    Details|re: '^"c:\\program files( \(x86\))?\\microsoft\\edge\\application\\msedge\.exe"( --[a-z-]+)+$'
+    EventType: DeleteValue  # removing an autostart entry is not persistence
 alert: "{Image} set autostart {TargetObject}"
