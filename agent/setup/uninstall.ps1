@@ -45,6 +45,9 @@ function Uninstall-Aegis([bool]$Quiet) {
     if (-not $other) { Remove-Item -LiteralPath $c -Recurse -Force -ErrorAction SilentlyContinue }
   }
   Remove-Item -LiteralPath "$env:PUBLIC\Documents\Aegis Ransomware Drill" -Recurse -Force -ErrorAction SilentlyContinue
+  # the installer's "My device" shortcut; we may be SYSTEM here, so look on every profile's desktop
+  Get-ChildItem -Path "$env:SystemDrive\Users\*\Desktop\Aegis - My device.url", "$env:SystemDrive\Users\*\OneDrive*\Desktop\Aegis - My device.url" -Force -ErrorAction SilentlyContinue |
+    Remove-Item -Force -ErrorAction SilentlyContinue
 
   if (Test-Path "$Dir\sysmon\installed-by-aegis.txt") {
     $exe = (Get-Content "$Dir\sysmon\installed-by-aegis.txt" -Raw).Trim()

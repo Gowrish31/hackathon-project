@@ -64,7 +64,10 @@ def classify(channel: str, eid: int, d: Dict[str, str]) -> Tuple[str, str]:
         if eid == 8:
             return "injection", f"{base(d.get('SourceImage'))} created remote thread in {base(d.get('TargetImage'))}"
         if eid == 10:
-            return "injection", f"{base(d.get('SourceImage'))} accessed {base(d.get('TargetImage'))} (access {d.get('GrantedAccess', '?')})"
+            # Process access is useful evidence (and critical when the target is LSASS), but it is
+            # not by itself code injection. Keep real remote-thread activity in the red Injection
+            # category so normal EDR telemetry does not make the console look like an attack.
+            return "access", f"{base(d.get('SourceImage'))} accessed {base(d.get('TargetImage'))} (access {d.get('GrantedAccess', '?')})"
         if eid in (11, 15):
             return "file", f"{img} created {d.get('TargetFilename', '')}"
         if eid in (12, 13, 14):
@@ -166,8 +169,30 @@ def _enrich_logon_failure(d: Dict[str, str]) -> None:
     d["Source"] = "the local sign-in screen" if ip in LOCAL_SOURCES else ip
 
 
+_PF_TAIL = "gram Files"
+
+
+def _repair_path(v: str) -> str:
+    """Sysmon on Windows-on-ARM sometimes hands back the first 8 bytes of a parent's image path or
+    command line as garbage when the parent is an emulated x64 process: 'C:\\Program Files\\..' arrives
+    as '_:\\P\u8cb6\uc7d7gram Files\\..' (a quoted command line likewise, as '_C:\\..ogram Files'). Only that
+    exact shape is rebuilt: a prefix of the right length, with non-ASCII noise and otherwise matching
+    'C:\\Pro' / '"C:\\Pro', right before 'gram Files'."""
+    for good in ("C:\\Pro", '"C:\\Pro'):
+        n = len(good)
+        if v[n:n + len(_PF_TAIL)] != _PF_TAIL:
+            continue
+        prefix = v[:n]
+        noisy = any(ord(ch) >= 128 for ch in prefix)
+        # every character is either right, noise, or the first one (seen as '_' or ')')
+        fits = all(ch == g or ord(ch) >= 128 or k == 0 for k, (ch, g) in enumerate(zip(prefix, good)))
+        if noisy and fits:
+            return good + v[n:]
+    return v
+
+
 def normalize(raw: Dict[str, Any], skew: timedelta = timedelta(0)) -> Dict[str, Any]:
-    data = {k: ("" if v is None else str(v)) for k, v in (raw.get("data") or {}).items()}
+    data = {k: ("" if v is None else _repair_path(str(v))) for k, v in (raw.get("data") or {}).items()}
     channel = raw.get("channel") or ""
     eid = int(raw.get("event_id") or 0)
     if channel == SECURITY and eid == 4625:

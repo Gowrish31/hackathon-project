@@ -68,12 +68,21 @@ class Devices:
 
         events = self.db.list_events(60, a["id"])
         cats = Counter(e["category"] for e in self.db.list_events(500, a["id"]))
+        # The owner-facing portal gets a concise, factual proof that the detection pipeline
+        # was last exercised on this exact endpoint. It never exposes console-wide drills.
+        with self.db.lock:
+            try:
+                row = self.db.conn.execute(
+                    "SELECT test, started_at FROM validations WHERE agent_id=? ORDER BY id DESC LIMIT 1", (a["id"],)).fetchone()
+            except Exception:
+                row = None
         return {
             "host": a["hostname"], "os": a.get("os"), "arch": info.get("arch"), "user": a.get("user"),
             "ip": a.get("ip"), "version": a.get("agent_version"), "installed": info.get("mode") == "service",
             "is_admin": a.get("is_admin"), "first_seen": a.get("first_seen"), "last_seen": a.get("last_seen"),
             "events_sent": info.get("events_sent", 0), "channels": info.get("channels") or [],
             "canary_armed": (info.get("canary") or {}).get("armed"),
+            "last_drill": {"test": row["test"], "started_at": row["started_at"]} if row else None,
             "isolated": isolated,
             "uninstall": {"status": unin["status"], "created_at": unin["created_at"]} if unin else None,
             "cases": cases,

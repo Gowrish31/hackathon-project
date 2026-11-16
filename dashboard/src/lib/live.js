@@ -140,6 +140,7 @@ export const CATEGORIES = {
   account:     { label: "Account",     color: "var(--c-account)" },
   persistence: { label: "Persistence", color: "var(--c-persistence)" },
   script:      { label: "PowerShell",  color: "var(--c-script)" },
+  access:      { label: "Process access", color: "var(--c-other)" },
   injection:   { label: "Injection",   color: "var(--color-crit)" },
   tamper:      { label: "Tamper",      color: "var(--color-crit)" },
   av:          { label: "Defender",    color: "var(--color-crit)" },
@@ -148,6 +149,11 @@ export const CATEGORIES = {
   other:       { label: "Other",       color: "var(--c-other)" },
 };
 export const catStyle = (c) => CATEGORIES[c] || CATEGORIES.other;
+
+// Older events recorded Sysmon Event 10 as "injection". It is ordinary process-access
+// telemetry unless an actual remote-thread event (Sysmon 8) occurred, so display old and
+// new data consistently without changing historical evidence in SQLite.
+export const eventCategory = (event) => event?.event_id === 10 && event?.category === "injection" ? "access" : event?.category;
 
 export const SEVERITY = {
   critical: { label: "Critical", color: "var(--color-crit)", rank: 4 },

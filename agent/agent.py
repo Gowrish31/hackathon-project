@@ -18,6 +18,7 @@ import argparse
 import collections
 import ctypes
 import getpass
+from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 import ipaddress
 import json
 import logging
@@ -40,7 +41,7 @@ from typing import Any, Dict, List, Optional
 if os.name != "nt":  # pragma: no cover
     sys.exit("The Aegis agent only runs on Windows.")
 
-AGENT_VERSION = "0.4.2"
+AGENT_VERSION = "0.4.6"
 HERE = os.path.dirname(os.path.abspath(__file__))
 CONFIG_PATH = os.path.join(HERE, "config.json")
 TASK_NAME = "Aegis Agent"
@@ -260,8 +261,12 @@ def isolation_save(state: Dict[str, Any]) -> None:
 def address_ranges_except(keep: List[str]) -> List[str]:
     """Every IPv4 and IPv6 address as ranges, minus the ones in `keep`."""
     out: List[str] = []
-    for version, cls, hi in ((4, ipaddress.IPv4Address, 2 ** 32 - 1), (6, ipaddress.IPv6Address, 2 ** 128 - 1)):
-        start = 1  # address 0 is never a real peer, and some firewall builds reject it
+    # Range endpoints must be ordinary unicast: Windows Firewall rejects a range that starts or ends
+    # on ::, ::1 (loopback) or ff00::/8 (multicast). IPv6 multicast is left out of the block; it never
+    # leaves the local link anyway.
+    for version, cls, lo, hi in ((4, ipaddress.IPv4Address, 1, 2 ** 32 - 1),
+                                 (6, ipaddress.IPv6Address, 2, int(ipaddress.IPv6Address("feff:ffff:ffff:ffff:ffff:ffff:ffff:ffff")))):
+        start = lo
         for k in sorted(int(ipaddress.ip_address(i)) for i in keep if ipaddress.ip_address(i).version == version):
             if k > start:
                 out.append(f"{cls(start)}-{cls(k - 1)}")
@@ -454,8 +459,12 @@ def iso_utc(t: Optional[float] = None) -> str:
     return time.strftime("%Y-%m-%dT%H:%M:%S", time.gmtime(t)) + f".{int((t % 1) * 1000):03d}Z"
 
 
-def count_damage(root: str, since: float, budget_s: float = 2.0) -> Dict[str, Any]:
-    """Files under `root` written or created since `since` (the attacker's start time)."""
+def count_damage(root: str, since: float, locked_ext: Optional[str] = None, budget_s: float = 2.0) -> Dict[str, Any]:
+    """Files under `root` written or created since `since` (the attacker's start time).
+    No slack before `since`: file and process times come from the same clock, and a slack window
+    used to swallow files written just before the attacker started (the drill seeds its 142 files
+    a split second before it launches the encryptor, so every one of them counted as encrypted).
+    `locked_ext` (drills): count the files the encryptor actually produced - exact, not inferred."""
     changed = total = 0
     truncated = False
     t0 = time.time()
@@ -466,7 +475,10 @@ def count_damage(root: str, since: float, budget_s: float = 2.0) -> Dict[str, An
                 st = os.stat(os.path.join(dirpath, name))
             except OSError:
                 continue
-            if max(st.st_mtime, st.st_ctime) >= since - 0.5:
+            if locked_ext:
+                if name.lower().endswith(locked_ext):
+                    changed += 1
+            elif max(st.st_mtime, st.st_ctime) >= since:
                 changed += 1
         if time.time() - t0 > budget_s:
             truncated = True
@@ -480,6 +492,104 @@ def load_config() -> Dict[str, Any]:
             return json.load(f)
     except (FileNotFoundError, ValueError):
         return {}
+
+
+# --------------------------------------------------------------------------- local owner portal
+OWNER_PORT = 8765
+
+
+class OwnerPortal:
+    """A small loopback-only owner view.
+
+    It deliberately binds to 127.0.0.1: a browser on another laptop cannot reach it.
+    The agent, not the browser, uses its private enrollment key to retrieve this device's
+    state from the console, so no reusable cloud URL or credential is exposed.
+    """
+    def __init__(self, agent: "Agent") -> None:
+        self.agent = agent
+        self.httpd: Optional[ThreadingHTTPServer] = None
+
+    @property
+    def page_path(self) -> str:
+        return os.path.join(HERE, "device.html")
+
+    def _page(self) -> bytes:
+        # An updated agent can bootstrap the static owner page itself, so existing installations
+        # gain the portal after a normal agent update rather than a full reinstall.
+        try:
+            # Refresh on every agent start. The page carries no secrets; keeping it current lets
+            # a normal agent update deliver owner-facing improvements without a reinstall.
+            req = urllib.request.Request(self.agent.server + "/api/agent/files/device.html")
+            with urllib.request.urlopen(req, timeout=15) as resp:
+                content = resp.read()
+            if b"<html" not in content.lower():
+                raise ValueError("invalid owner page")
+            with open(self.page_path + ".new", "wb") as f:
+                f.write(content)
+            os.replace(self.page_path + ".new", self.page_path)
+            with open(self.page_path, "rb") as f:
+                return f.read()
+        except Exception as e:
+            log.warning("owner portal page unavailable: %s", e)
+            return b"<h1>Aegis owner portal is starting</h1><p>Refresh this page in a moment.</p>"
+
+    def start(self) -> None:
+        agent = self.agent
+        page = self._page()
+
+        class Handler(BaseHTTPRequestHandler):
+            def log_message(self, _fmt, *_args):
+                pass  # local page refreshes should not flood the agent log
+
+            def send_body(self, status: int, body: bytes, content_type: str) -> None:
+                self.send_response(status)
+                self.send_header("Content-Type", content_type)
+                self.send_header("Cache-Control", "no-store")
+                self.send_header("Content-Length", str(len(body)))
+                self.end_headers()
+                self.wfile.write(body)
+
+            def state(self) -> None:
+                try:
+                    payload = agent._request("GET", f"/api/agents/{agent.agent_id}/owner/state", timeout=12)
+                    self.send_body(200, json.dumps(payload).encode(), "application/json; charset=utf-8")
+                except Exception as e:
+                    self.send_body(502, json.dumps({"detail": f"Aegis console unavailable: {e}"}).encode(), "application/json; charset=utf-8")
+
+            def do_GET(self) -> None:
+                path = urllib.parse.urlsplit(self.path).path
+                if path in ("/", "/index.html"):
+                    self.send_body(200, page, "text/html; charset=utf-8")
+                elif path == "/api/device/state":
+                    self.state()
+                else:
+                    self.send_body(404, b'{"detail":"not found"}', "application/json; charset=utf-8")
+
+            def do_POST(self) -> None:
+                path = urllib.parse.urlsplit(self.path).path
+                if path != "/api/device/uninstall":
+                    self.send_body(404, b'{"detail":"not found"}', "application/json; charset=utf-8")
+                    return
+                try:
+                    payload = agent._request("POST", f"/api/agents/{agent.agent_id}/owner/uninstall", timeout=12)
+                    self.send_body(200, json.dumps(payload).encode(), "application/json; charset=utf-8")
+                except urllib.error.HTTPError as e:
+                    detail = e.read() or b'{"detail":"request failed"}'
+                    self.send_body(e.code, detail, "application/json; charset=utf-8")
+                except Exception as e:
+                    self.send_body(502, json.dumps({"detail": f"Aegis console unavailable: {e}"}).encode(), "application/json; charset=utf-8")
+
+        try:
+            self.httpd = ThreadingHTTPServer(("127.0.0.1", OWNER_PORT), Handler)
+            threading.Thread(target=self.httpd.serve_forever, daemon=True, name="owner_portal").start()
+            log.info("owner portal listening on http://127.0.0.1:%s", OWNER_PORT)
+        except OSError as e:
+            log.warning("owner portal not started: %s", e)
+
+    def close(self) -> None:
+        if self.httpd:
+            self.httpd.shutdown()
+            self.httpd.server_close()
 
 
 # --------------------------------------------------------------------------- agent
@@ -514,6 +624,7 @@ class Agent:
         self.canaries: Dict[str, Dict[str, Any]] = {}  # path -> {sig, root, drill, magic}
         self.canary_lock = threading.Lock()
         self.last_trip: Optional[Dict[str, Any]] = None
+        self.owner_portal = OwnerPortal(self) if self.service else None
 
     # ---- http
     def _request(self, method: str, path: str, body: Any = None, timeout: float = 8) -> Any:
@@ -911,7 +1022,7 @@ class Agent:
         log.warning("CANARY %s %s -> %s pid=%s: %s", path, change, top and top["image"], top and top["pid"], action)
 
         since = (top or {}).get("started") or (tripped - 60)
-        dmg = count_damage(c["root"], since)
+        dmg = count_damage(c["root"], since, DRILL_EXT if c["drill"] else None)
         data = {
             "CanaryFile": path, "Change": change, "Action": action, "Confidence": "high" if clear else "low",
             "TrippedAt": iso_utc(tripped), "ScanRoot": c["root"], "Drill": "true" if c["drill"] else "false",
@@ -989,7 +1100,9 @@ class Agent:
         st = isolation_load()
         # 1. the block rules: if this fails we stay "isolated" (state file and pinned console IPs kept),
         #    so the agent can still reach the console and the failsafe can retry
-        run_ps(f"Get-NetFirewallRule -Group '{ISOLATION_GROUP}' -ErrorAction SilentlyContinue | Remove-NetFirewallRule")
+        # `exit 0`: with no rules in the group the silenced lookup still leaves $? false, and powershell
+        # would exit 1 - which used to make every release after a failed isolate fail too
+        run_ps(f"Get-NetFirewallRule -Group '{ISOLATION_GROUP}' -ErrorAction SilentlyContinue | Remove-NetFirewallRule; exit 0")
         left = run_ps(f"@(Get-NetFirewallRule -Group '{ISOLATION_GROUP}' -ErrorAction SilentlyContinue).Count")
         if left.strip() not in ("", "0"):
             raise RuntimeError(f"{left.strip()} isolation firewall rules are still in place")
@@ -1032,6 +1145,8 @@ class Agent:
         if not self.channels_ok:
             log.error("no event channels available - is Sysmon installed?")
             return 1
+        if self.owner_portal:
+            self.owner_portal.start()
         for fn in (self.sender_loop, self.heartbeat_loop, self.command_loop, self.canary_loop):
             threading.Thread(target=fn, daemon=True, name=fn.__name__).start()
         log.info("agent %s v%s (%s) shipping to %s", self.agent_id, AGENT_VERSION, self.hostname, self.server)
@@ -1046,6 +1161,8 @@ class Agent:
             time.sleep(0.2)
         for h in self.subscriptions:
             wevtapi.EvtClose(h)
+        if self.owner_portal:
+            self.owner_portal.close()
         log.info("stopping (exit %d)", self.exit_code)
         return self.exit_code
 

@@ -353,18 +353,17 @@ async def judge_run(token: str, body: JudgeRun):
 
 # ------------------------------------------------------------ "my device" page (for the laptop's owner)
 @app.post("/api/agents/{agent_id}/device_link")
-async def device_link(agent_id: str, rotate: bool = False):
-    """Console only: the private read-only link for one laptop. ?rotate=1 kills the old link."""
-    tok = devices.link(agent_id, rotate)
-    if not tok:
+async def device_link(agent_id: str):
+    """The owner portal is deliberately local to the endpoint, never a shareable cloud link."""
+    if not any(a["id"] == agent_id for a in db.list_agents()):
         raise HTTPException(404, "unknown endpoint")
-    return {"token": tok, "path": f"/device/{tok}"}
+    return {"url": "http://127.0.0.1:8765/", "detail": "Open this on the protected laptop."}
 
 
 # public (no console login): the token in the path is the credential
 @app.get("/device/{token}")
 async def device_page(token: str):
-    return FileResponse(HERE / "device.html", media_type="text/html", headers={"Cache-Control": "no-store"})
+    raise HTTPException(410, "This dashboard now opens only on the protected laptop at http://127.0.0.1:8765/.")
 
 
 def _device(token: str) -> Dict[str, Any]:
@@ -376,18 +375,37 @@ def _device(token: str) -> Dict[str, Any]:
 
 @app.get("/api/device/{token}/state")
 async def device_state(token: str):
-    return devices.state(_device(token))
+    raise HTTPException(410, "This dashboard now opens only on the protected laptop.")
 
 
 @app.post("/api/device/{token}/uninstall")
 async def device_uninstall(token: str):
-    a = _device(token)
+    raise HTTPException(410, "This dashboard now opens only on the protected laptop.")
+
+
+def _owner_agent(agent_id: str, token: Optional[str]) -> Dict[str, Any]:
+    """Authenticate the local portal through the agent's per-device credential."""
+    check_token(token, agent_id)
+    agent = next((a for a in db.list_agents() if a["id"] == agent_id), None)
+    if not agent:
+        raise HTTPException(404, "unknown endpoint")
+    return agent
+
+
+@app.get("/api/agents/{agent_id}/owner/state")
+async def owner_state(agent_id: str, x_agent_token: Optional[str] = Header(None)):
+    return devices.state(_owner_agent(agent_id, x_agent_token))
+
+
+@app.post("/api/agents/{agent_id}/owner/uninstall")
+async def owner_uninstall(agent_id: str, x_agent_token: Optional[str] = Header(None)):
+    a = _owner_agent(agent_id, x_agent_token)
     if (a.get("info") or {}).get("mode") != "service":
         raise HTTPException(409, "This agent was started by hand, so it cannot remove itself. Ask the security team.")
     pending = next((c for c in db.list_commands(a["id"], 10)
                     if c["type"] == "uninstall" and c["status"] in ("pending", "sent")), None)
     if not pending:
-        await enqueue(a["id"], "uninstall", {"requested_by": "device owner"})
+        await enqueue(a["id"], "uninstall", {"requested_by": "device owner (local portal)"})
     return devices.state(a)
 
 
@@ -442,7 +460,7 @@ async def _lan_discovery():
     # setup.ps1 from the public download page broadcasts on UDP 47800 to find this console
     await start_discovery(int(os.environ.get("AEGIS_PORT", "8000")))
 
-AGENT_FILES = {"agent.py", "requirements.txt", "install_sysmon.ps1", "install.ps1", "uninstall.ps1"}
+AGENT_FILES = {"agent.py", "requirements.txt", "install_sysmon.ps1", "install.ps1", "uninstall.ps1", "device.html"}
 
 
 @app.get("/api/agent/files/{name}")
@@ -450,7 +468,7 @@ async def agent_file(name: str):
     """Lets the VM pull the latest agent with one `iwr` line (no clipboard / file share needed)."""
     if name not in AGENT_FILES:
         raise HTTPException(404)
-    path = HERE.parent / "agent" / ("setup" if name.endswith(".ps1") else "") / name
+    path = HERE / "device.html" if name == "device.html" else HERE.parent / "agent" / ("setup" if name.endswith(".ps1") else "") / name
     return FileResponse(path, media_type="text/plain")
 
 

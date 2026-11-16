@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { useLive, isOnline, SEVERITY, api } from "./lib/live.js";
+import { useLive, isOnline, SEVERITY, api, eventCategory } from "./lib/live.js";
 import { Rail, TopBar, Segmented } from "./components/Shell.jsx";
 import ThreatTimeline from "./components/Timeline.jsx";
 import Overview from "./components/Overview.jsx";
@@ -96,11 +96,14 @@ export default function App() {
     () => (scope ? live.events.filter((e) => e.agent_id === scope) : live.events), [live.events, scope]);
   const counts = useMemo(() => {
     const c = {};
-    for (const e of scopedEvents) c[e.category] = (c[e.category] || 0) + 1;
+    for (const e of scopedEvents) {
+      const kind = eventCategory(e);
+      c[kind] = (c[kind] || 0) + 1;
+    }
     return c;
   }, [scopedEvents]);
   const visibleEvents = useMemo(() => scopedEvents.filter(
-    (e) => (!category || e.category === category) &&
+    (e) => (!category || eventCategory(e) === category) &&
       (!q || e.summary.toLowerCase().includes(q) || JSON.stringify(e.data).toLowerCase().includes(q))
   ), [scopedEvents, category, q]);
 

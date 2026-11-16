@@ -219,6 +219,19 @@ function Install-Aegis {
     Write-Host '  The agent has not checked in yet. Its log is at' -ForegroundColor Yellow
     Write-Host "  $Dir\logs\agent.log" -ForegroundColor Yellow
   }
+  # ---------------------------------------------------------- the owner's own page (bound to this laptop only)
+  $deviceUrl = 'http://127.0.0.1:8765/'
+  Write-Host ''
+  Write-Host '  Your device page (status, alerts, uninstall):' -ForegroundColor Cyan
+  Write-Host "  $deviceUrl" -ForegroundColor White
+  Write-Host '  This opens only on this laptop; it cannot be shared or opened remotely.' -ForegroundColor DarkGray
+  try {
+    $lnk = Join-Path ([Environment]::GetFolderPath('Desktop')) 'Aegis - My device.url'
+    [IO.File]::WriteAllText($lnk, "[InternetShortcut]`r`nURL=$deviceUrl`r`n")
+    Write-Host '  A shortcut "Aegis - My device" is on your desktop.' -ForegroundColor DarkGray
+  } catch { }
+  try { Start-Process $deviceUrl } catch { }
+  Write-Host ''
   Write-Host '  Uninstall any time:' -ForegroundColor DarkGray
   Write-Host "  & `"$Dir\uninstall.ps1`"" -ForegroundColor DarkGray
   Write-Host ''

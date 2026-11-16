@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { api, ago, basename, caseNo, fmtTime, isOnline } from "../lib/live.js";
+import { api, ago, basename, caseNo, eventCategory, fmtTime, isOnline } from "../lib/live.js";
 import { SeverityMark, StatusMark, useAlertCommands } from "./Alerts.jsx";
 import ProcessGraph from "./ProcessGraph.jsx";
 import AttackStory from "./AttackStory.jsx";
@@ -7,6 +7,7 @@ import Inspector from "./Inspector.jsx";
 import Analyst from "./Analyst.jsx";
 import Verify from "./Verify.jsx";
 import KillSwitch from "./KillSwitch.jsx";
+import ProtectionProof from "./ProtectionProof.jsx";
 import { catStyle } from "../lib/live.js";
 import { IsolateControl, IsolationBanner } from "./Isolation.jsx";
 
@@ -55,6 +56,7 @@ export default function Overview({ incidents, agents, events, cmdLog, kick, onOp
 
   return (
     <div className="flex-1 overflow-y-auto">
+      <ProtectionProof agents={agents} kick={kick} onOpenAlert={onOpenAlert} />
       {/* left: investigation, then fleet + validation; right: the inspector, full height */}
       <div className={`grid min-h-full ${lead ? "min-[1180px]:grid-cols-[minmax(0,1fr)_340px]" : ""}`}>
        <div className="flex min-w-0 flex-col">
@@ -141,7 +143,11 @@ function EndpointTelemetry({ host, events, cmdLog }) {
   const cats = {};
   for (const e of mine) {
     const m = Math.floor((now - Date.parse(e.ts)) / 60000);
-    if (m >= 0 && m < 30) { bins[29 - m]++; cats[e.category] = (cats[e.category] || 0) + 1; }
+    if (m >= 0 && m < 30) {
+      bins[29 - m]++;
+      const kind = eventCategory(e);
+      cats[kind] = (cats[kind] || 0) + 1;
+    }
   }
   const max = Math.max(1, ...bins);
   const total = bins.reduce((a, b) => a + b, 0);

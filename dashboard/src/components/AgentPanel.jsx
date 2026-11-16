@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { api, isOnline, ago, fmtTime, catStyle, sevStyle, statusStyle } from "../lib/live.js";
+import { api, isOnline, ago, fmtTime, catStyle, eventCategory, sevStyle, statusStyle } from "../lib/live.js";
 import Onboarding from "./Onboarding.jsx";
 import { IsolateControl, IsolationBanner } from "./Isolation.jsx";
 
@@ -18,7 +18,10 @@ export default function Endpoints({ agents, commands, cmdLog, alerts, events, in
     const id = setInterval(() => force((n) => n + 1), 5000);
     return () => clearInterval(id);
   }, []);
-  const list = Object.values(agents).sort((a, b) => (b.last_seen || "").localeCompare(a.last_seen || ""));
+  // Keep endpoint cards in a predictable order. Sorting by heartbeat time made hosts swap
+  // places every time one checked in, which is distracting while monitoring the fleet.
+  const list = Object.values(agents).sort((a, b) => (a.first_seen || "").localeCompare(b.first_seen || "") ||
+    (a.hostname || "").localeCompare(b.hostname || ""));
   const showAdd = adding || !list.length;
 
   const openHost = (id) => {
@@ -48,27 +51,6 @@ export default function Endpoints({ agents, commands, cmdLog, alerts, events, in
 }
 
 const ACTION_NAMES = { kill_process: (c) => `terminate PID ${c.args?.pid}`, run_test: () => "detection drill", update: () => "agent update", uninstall: () => "uninstall", isolate_host: () => "network isolation", release_host: () => "release from isolation" };
-
-/** The laptop owner's read-only page: status, cases, activity and an uninstall button, nothing else. */
-function DeviceLink({ agentId, className }) {
-  const [msg, setMsg] = useState(null);
-  const copy = async () => {
-    try {
-      const r = await api.post(`/api/agents/${agentId}/device_link`, {});
-      if (!r.path) throw new Error(r.detail || "failed");
-      const url = `${location.origin}${r.path}`;
-      try { await navigator.clipboard.writeText(url); setMsg("Link copied"); }
-      catch { window.open(url, "_blank", "noopener"); setMsg("Opened in a new tab"); }
-    } catch { setMsg("Could not make a link"); }
-    setTimeout(() => setMsg(null), 2500);
-  };
-  return (
-    <button onClick={copy} className={className}
-      title="Copy a private read-only page for this laptop's owner: what Aegis sees, plus an uninstall button. No response controls.">
-      {msg || "Device page"}
-    </button>
-  );
-}
 
 function HostCard({ a, cmd, cmdLog, alerts, events, scope, onScope, onOpenAlert }) {
   const [confirm, setConfirm] = useState(false);
@@ -121,7 +103,6 @@ function HostCard({ a, cmd, cmdLog, alerts, events, scope, onScope, onOpenAlert 
                 className={`h-7 rounded-md border px-2.5 text-xs ${scope === a.id ? "border-accent/50 bg-accent/10 text-accent" : "border-line text-text-2 hover:border-text-2/40 hover:text-text"}`}>
                 {scope === a.id ? "Showing this host" : "Focus on host"}
               </button>
-              <DeviceLink agentId={a.id} className={btn} />
               <button onClick={() => setConfirm(true)} disabled={removing} className={`${btn} hover:!border-crit/50 hover:!text-crit`}>Remove</button>
             </>
           )}
@@ -187,13 +168,18 @@ export function HostActivity({ events, alerts, onOpenAlert }) {
   const now = Date.now();
   const bins = Array(30).fill(0);
   const cats = {};
-  for (const e of events) {
+  const recentEvents = events.filter((e) => {
+    const age = now - Date.parse(e.ts);
+    return age >= 0 && age < 30 * 60 * 1000;
+  });
+  for (const e of recentEvents) {
     const m = Math.floor((now - Date.parse(e.ts)) / 60000);
     if (m >= 0 && m < 30) bins[29 - m]++;
-    cats[e.category] = (cats[e.category] || 0) + 1;
+    const kind = eventCategory(e);
+    cats[kind] = (cats[kind] || 0) + 1;
   }
   const max = Math.max(1, ...bins);
-  const total = events.length || 1;
+  const total = recentEvents.length || 1;
   const top = Object.entries(cats).sort((x, y) => y[1] - x[1]).slice(0, 6);
   const recent = alerts.slice().sort((x, y) => y.ts.localeCompare(x.ts)).slice(0, 4);
 

@@ -1,6 +1,6 @@
 import { IsolateControl } from "./Isolation.jsx";
 import { useEffect, useMemo, useRef, useState } from "react";
-import { caseNo, api, ago, basename, fmtTime, sevStyle, statusStyle, catStyle } from "../lib/live.js";
+import { caseNo, api, ago, basename, eventCategory, fmtTime, sevStyle, statusStyle, catStyle } from "../lib/live.js";
 import AttackStory from "./AttackStory.jsx";
 import KillSwitch from "./KillSwitch.jsx";
 import ProcessGraph from "./ProcessGraph.jsx";
@@ -281,7 +281,7 @@ export function IncidentDetail({ incident, alert, onSelectAlert, agents, cmdLog,
               <button key={e.id} onClick={() => onOpenEvent(e)}
                 className="flex w-full items-start gap-3 border-b border-line-soft px-3 py-2 text-left text-xs last:border-0 hover:bg-surface">
                 <span className="shrink-0 font-mono text-muted">{fmtTime(e.ts)}</span>
-                <span className="w-20 shrink-0" style={{ color: catStyle(e.category).color }}>{catStyle(e.category).label}</span>
+                <span className="w-20 shrink-0" style={{ color: catStyle(eventCategory(e)).color }}>{catStyle(eventCategory(e)).label}</span>
                 <span className="min-w-0 break-all font-mono text-text-2">{e.summary}</span>
               </button>
             ))}

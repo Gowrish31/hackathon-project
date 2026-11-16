@@ -46,8 +46,8 @@
 
   .case { border: 1px solid var(--line); border-left: 4px solid var(--sev, var(--line)); background: var(--surface); border-radius: 3px; padding: 12px 14px; }
   .case + .case { margin-top: 10px; }
-  .case .top { display: flex; gap: 10px; align-items: baseline; }
-  .case .t { font-weight: 700; }
+  .case .top { display: flex; gap: 10px; align-items: baseline; min-width: 0; }
+  .case .t { min-width: 0; font-weight: 700; overflow-wrap: anywhere; }
   .case .when { margin-left: auto; font-size: 12px; color: var(--muted); white-space: nowrap; }
   .case .meta { font-size: 13px; color: var(--muted); margin-top: 2px; }
   .case .meta b { font-weight: 700; }
@@ -63,7 +63,7 @@
   .legend { display: flex; flex-wrap: wrap; gap: 4px 12px; margin: 8px 0 12px; font-size: 12px; color: var(--muted); }
   .legend i { display: inline-block; width: 8px; height: 8px; border-radius: 2px; margin-right: 4px; vertical-align: 0; }
   ol.feed { list-style: none; padding: 0; border-top: 1px solid var(--line-soft); max-height: 560px; overflow-y: auto; }
-  ol.feed li { display: grid; grid-template-columns: 64px 78px minmax(0, 1fr); gap: 8px; padding: 6px 0; border-bottom: 1px solid var(--line-soft); font-size: 13px; align-items: baseline; }
+  ol.feed li { display: grid; grid-template-columns: 64px 94px minmax(0, 1fr); gap: 8px; min-width: 0; padding: 6px 0; border-bottom: 1px solid var(--line-soft); font-size: 13px; align-items: baseline; }
   ol.feed .ts { color: var(--muted); }
   ol.feed .cat { font-size: 12px; font-weight: 700; }
   ol.feed .sum { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
@@ -92,11 +92,12 @@
   <p id="hostline">Connecting…</p>
 </div></header>
 <main class="wrap" id="app" aria-live="polite"></main>
-<footer>This page only shows what Aegis sees on this laptop. Your security team handles any response.</footer>
+<footer>This dashboard is available only on this laptop. Your security team handles any response.</footer>
 <script>
 (() => {
+  const localPortal = location.hostname === "127.0.0.1" || location.hostname === "localhost";
   const token = location.pathname.split("/").filter(Boolean).pop();
-  const base = `/api/device/${encodeURIComponent(token)}`;
+  const base = localPortal ? "/api/device" : `/api/device/${encodeURIComponent(token)}`;
   const app = document.getElementById("app");
   const hostEl = document.getElementById("host");
   const hostline = document.getElementById("hostline");
@@ -119,10 +120,11 @@
   const CAT = {
     process: ["Process", "#1f3d66"], network: ["Network", "#2f6f73"], dns: ["DNS", "#5a7d2a"], file: ["File", "#7a5c1e"],
     registry: ["Registry", "#6b4f7a"], auth: ["Sign-in", "#8a4b2a"], account: ["Account", "#8a4b2a"], persistence: ["Persistence", "#9a3b5a"],
-    script: ["PowerShell", "#3b5b9a"], injection: ["Injection", "#bf1131"], tamper: ["Tamper", "#bf1131"], av: ["Defender", "#bf1131"],
+    script: ["PowerShell", "#3b5b9a"], access: ["Process access", "#7c8288"], injection: ["Injection", "#bf1131"], tamper: ["Tamper", "#bf1131"], av: ["Defender", "#bf1131"],
     ransomware: ["Ransomware", "#bf1131"], system: ["System", "#7c8288"], other: ["Other", "#7c8288"],
   };
   const cat = (c) => CAT[c] || CAT.other;
+  const eventCat = (e) => e?.event_id === 10 && e?.category === "injection" ? "access" : e?.category;
   const CHANNEL = {
     "Microsoft-Windows-Sysmon/Operational": "Programs, network and files (Sysmon)", "Security": "Sign-ins and accounts",
     "Microsoft-Windows-PowerShell/Operational": "PowerShell scripts", "Microsoft-Windows-Windows Defender/Operational": "Microsoft Defender",
@@ -181,6 +183,8 @@
       <div class="chips">${chans.map((k) => `<span class="chip ${s.channels.includes(k) ? "" : "off"}">${esc(CHANNEL[k])}</span>`).join("")}
         ${s.canary_armed ? `<span class="chip">Ransomware decoys · ${s.canary_armed} armed</span>` : ""}</div>
       <dl class="facts">
+        <div><dt>Access</dt><dd>Local to this laptop only</dd></div>
+        <div><dt>Last protection check</dt><dd>${s.last_drill ? `${esc(s.last_drill.test.replaceAll("_", " "))} · ${esc(ago(s.last_drill.started_at))}` : "Not run yet"}</dd></div>
         <div><dt>Signed-in user</dt><dd class="mono">${esc(s.user || "unknown")}</dd></div>
         <div><dt>Windows</dt><dd>${esc(s.os || "unknown")} ${esc(s.arch || "")}</dd></div>
         <div><dt>IP address</dt><dd class="mono">${esc(s.ip || "unknown")}</dd></div>
@@ -198,23 +202,34 @@
         <div class="top"><span class="t">${esc(c.title)}</span><span class="when" title="${esc(c.created_at)}">${esc(ago(c.created_at))}</span></div>
         <div class="meta"><b style="color:${sc}">${esc(sl)}</b> · ${esc(STATUS[c.status] || c.status)}${c.technique ? ` · <span class="mono">${esc(c.technique)}</span> ${esc(c.technique_name || "")}` : ""}</div>
         ${c.response ? `<div class="resp">${esc(c.response)}</div>` : ""}
-        ${c.ai ? `<div class="ai"><div class="h">${esc(c.ai.headline)}</div><div class="s">${esc(c.ai.story)}</div></div>`
+        ${c.ai ? `<div class="ai"><div class="h">${esc(c.ai.headline)}</div>${c.ai.story ? `<details><summary>More detail</summary><p>${esc(c.ai.story)}</p></details>` : ""}</div>`
           : c.description ? `<details><summary>What this means</summary><p>${esc(c.description)}</p></details>` : ""}
       </article>`;
     }).join("");
   }
 
   function activityBlock(s) {
-    const entries = Object.entries(s.categories);
+    // Apply the same historical Event 10 correction as the analyst console.
+    const categories = {};
+    for (const e of s.activity) {
+      const kind = eventCat(e);
+      categories[kind] = (categories[kind] || 0) + 1;
+    }
+    const entries = Object.entries(categories).sort((a, b) => b[1] - a[1]);
     const total = entries.reduce((n, [, v]) => n + v, 0) || 1;
     const bars = entries.map(([k, v]) => `<span style="width:${(v / total) * 100}%;background:${cat(k)[1]}" title="${esc(cat(k)[0])}: ${v}"></span>`).join("");
     const legend = entries.slice(0, 7).map(([k, v]) => `<span><i style="background:${cat(k)[1]}"></i>${esc(cat(k)[0])} ${v}</span>`).join("");
-    const rows = s.activity.map((e) => {
+    // A short recent sample helps the owner understand their device without drowning them in
+    // ordinary process and file telemetry. The security team retains the complete event stream.
+    const sample = s.activity.filter((e) => !["process", "file", "access"].includes(eventCat(e))).slice(0, 12);
+    const rows = sample.map((e) => {
       const fresh = seen.size && !seen.has(e.id);
-      return `<li class="${fresh ? "new" : ""}"><span class="ts mono">${esc(clock(e.ts))}</span><span class="cat" style="color:${cat(e.category)[1]}">${esc(cat(e.category)[0])}</span><span class="sum mono" title="${esc(e.summary)}">${esc(e.summary)}</span></li>`;
+      const kind = eventCat(e);
+      return `<li class="${fresh ? "new" : ""}"><span class="ts mono">${esc(clock(e.ts))}</span><span class="cat" style="color:${cat(kind)[1]}">${esc(cat(kind)[0])}</span><span class="sum mono" title="${esc(e.summary)}">${esc(e.summary)}</span></li>`;
     }).join("");
     s.activity.forEach((e) => seen.add(e.id));
     if (!s.activity.length) return `<div class="empty">No activity received yet.</div>`;
+    if (!sample.length) return `<div class="empty">No notable activity in the latest events.</div>`;
     return `<div class="bars">${bars}</div><div class="legend">${legend}</div><ol class="feed">${rows}</ol>`;
   }
 

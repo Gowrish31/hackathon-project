@@ -1,4 +1,4 @@
-import { CATEGORIES, catStyle, fmtTime } from "../lib/live.js";
+import { CATEGORIES, catStyle, eventCategory, fmtTime } from "../lib/live.js";
 
 export function CategoryLabel({ cat }) {
   const s = catStyle(cat);
@@ -91,7 +91,7 @@ export default function EventFeed({ events, selectedId, onSelect }) {
               className={`cursor-pointer border-b border-line-soft transition-colors ${e._new ? "row-new" : ""} ${selectedId === e.id ? "bg-raised" : "hover:bg-surface"}`}>
               <td className="px-5 py-1.5 font-mono text-xs text-muted">{fmtTime(e.ts)}</td>
               <td className="truncate px-2 py-1.5 text-text-2">{e.hostname}</td>
-              <td className="px-2 py-1.5"><CategoryLabel cat={e.category} /></td>
+              <td className="px-2 py-1.5"><CategoryLabel cat={eventCategory(e)} /></td>
               <td className="px-2 py-1.5 text-right font-mono text-xs text-muted">{e.event_id}</td>
               <td className="truncate px-4 py-1.5 font-mono text-xs" title={e.summary}>{e.summary}</td>
             </tr>
